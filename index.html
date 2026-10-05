@@ -1045,7 +1045,9 @@ async function forgotCloudPassword(){
   if(!email)return alert("اكتب البريد الإلكتروني للحساب أولاً");
   if(!email.includes("@"))return alert("أدخل بريداً إلكترونياً صحيحاً");
   try{
-    let redirectTo=window.location.href.split("#")[0];
+    // Always return password-recovery links to the published Abu Adnan app path.
+    // This prevents GitHub Pages from falling back to the account root URL.
+    let redirectTo="https://husseinaljamale2000-maker.github.io/abu-adnan-pos/";
     if(!/^https?:$/i.test(window.location.protocol)){
       return alert("إعادة تعيين كلمة المرور عبر البريد تحتاج فتح البرنامج من رابط HTTPS. بعد رفع البرنامج على الموقع ستعمل هذه الخاصية.");
     }
@@ -1173,4 +1175,3 @@ setTimeout(function(){checkPasswordRecoveryLink();},0);
 </script>
 </body>
 </html>
-<!-- Abu Adnan Pages refresh -->
