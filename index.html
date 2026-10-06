@@ -1169,11 +1169,30 @@ function closeSalesDay(){
   activeSalesDay=nextSalesSessionKey(salesSessionDate(key));save();salesPage();alert("تم إغلاق الحساب بنجاح. تم فتح حساب جديد برصيد صفر.");
 }
 function reopenSalesDay(key){
-  let d=closedDays.find(x=>x.dayKey===key);if(!d)return alert("سجل الإغلاق غير موجود");
-  let activeRows=activeSalesDay?sales.filter(x=>x.dayKey===activeSalesDay):[];
-  if(activeRows.length&&activeSalesDay!==key)return alert("الحساب الحالي يحتوي على فواتير. أغلق الحساب الحالي أولاً ثم أعد فتح الحساب السابق.");
-  if(!confirm("إعادة فتح الحساب المغلق بتاريخ "+salesSessionDate(key)+"؟ ستعود فواتيره وحساباته كما كانت قبل الإغلاق."))return;
-  closedDays=closedDays.filter(x=>x.dayKey!==key);activeSalesDay=key;save();closeModal();salesPage();alert("تمت إعادة فتح الحساب. يمكنك الآن متابعة الفواتير عليه.");
+  const d=closedDays.find(x=>String(x.dayKey)===String(key));
+  if(!d)return alert("سجل الإغلاق غير موجود");
+  const targetKey=String(key);
+  const currentKey=activeSalesDay?String(activeSalesDay):"";
+  const activeRows=currentKey?sales.filter(x=>String(x.dayKey)===currentKey):[];
+  if(currentKey===targetKey){
+    closedDays=closedDays.filter(x=>String(x.dayKey)!==targetKey);
+    save();closeModal();salesPage();
+    alert("الحساب مفتوح بالفعل.");
+    return;
+  }
+  if(activeRows.length){
+    if(!confirm("الحساب الحالي يحتوي على "+activeRows.length+" عملية. سيتم حفظه كحساب مغلق ثم إعادة فتح الحساب السابق. هل تريد المتابعة؟"))return;
+    if(!closedDays.some(x=>String(x.dayKey)===currentKey)){
+      const currentRevenue=activeRows.filter(x=>!x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0);
+      const currentProfit=activeRows.filter(x=>!x.debtCollection).reduce((a,x)=>a+Number(x.profit||0),0);
+      closedDays.push({dayKey:currentKey,dateKey:salesSessionDate(currentKey),sessionNo:salesSessionNumber(currentKey),count:activeRows.length,revenue:currentRevenue,profit:currentProfit,invoiceIds:activeRows.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")});
+    }
+  }
+  if(!confirm("إعادة فتح الحساب رقم "+salesSessionNumber(targetKey)+" بتاريخ "+salesSessionDate(targetKey)+"؟"))return;
+  closedDays=closedDays.filter(x=>String(x.dayKey)!==targetKey);
+  activeSalesDay=targetKey;
+  save();closeModal();salesPage();
+  alert("تمت إعادة فتح الحساب بنجاح. يمكنك الآن متابعة الفواتير عليه.");
 }
 function showClosedDay(key){
   let d=closedDays.find(x=>x.dayKey===key);if(!d)return;let ids=Array.isArray(d.invoiceIds)?d.invoiceIds:[],rows=ids.length?sales.filter(x=>ids.includes(x.id)):sales.filter(x=>x.dayKey===key);
@@ -1236,7 +1255,7 @@ function debtsPage(){
   <div class="cards"><div class="stat"><span>عدد الأشخاص</span><b>${names.filter(n=>debts.some(d=>d.debtor===n&&Number(d.amount||0)>Number(d.paid||0))).length}</b></div><div class="stat"><span>إجمالي الديون المتبقية</span><b>${fmt(total)}</b></div></div>
   <div class="actions"><button class="green" onclick="addDebt()">➕ إضافة دين</button></div>
   <div class="tablewrap"><table><thead><tr><th>اسم الشخص</th><th>إجمالي الدين</th><th>المدفوع</th><th>المتبقي</th><th>الإجراء</th></tr></thead><tbody>
-  ${names.map(name=>{const rows=debts.filter(d=>d.debtor===name),amount=rows.reduce((a,d)=>a+Number(d.amount||0),0),paid=rows.reduce((a,d)=>a+Number(d.paid||0),0),remain=Math.max(0,amount-paid);return `<tr><td><button class="blue" onclick="showDebtorDetails('${String(name).replace(/'/g,"\\'")}')">${name}</button></td><td>${fmt(amount)}</td><td>${fmt(paid)}</td><td>${fmt(remain)}</td><td><button class="green" onclick="payDebt('${String(name).replace(/'/g,"\\'")}')">💵 تسديد</button> <button class="red" onclick="deleteDebtPerson('${String(name).replace(/'/g,"\\'")}')">حذف</button></td></tr>`}).join("")||'<tr><td colspan="5">لا توجد ديون مسجلة.</td></tr>'}
+  ${names.map(name=>{const rows=debts.filter(d=>d.debtor===name),amount=rows.reduce((a,d)=>a+Number(d.amount||0),0),paid=rows.reduce((a,d)=>a+Number(d.paid||0),0),remain=Math.max(0,amount-paid);return `<tr><td><button class="blue" onclick="showDebtorDetails('${String(name).replace(/'/g,"\\'")}')">${name}</button></td><td>${fmt(amount)}</td><td>${fmt(paid)}</td><td>${fmt(remain)}</td><td><button class="green" onclick="payDebt('${String(name).replace(/'/g,"\\'")}')">💵 تسديد</button>${window.ownerMode?` <button class="red" onclick="deleteDebtPerson('${String(name).replace(/'/g,"\\'")}')">حذف</button>`:""}</td></tr>`}).join("")||'<tr><td colspan="5">لا توجد ديون مسجلة.</td></tr>'}
   </tbody></table></div><div id="debtorDetails"></div>`;
 }
 function addDebt(){
@@ -1244,7 +1263,13 @@ function addDebt(){
   let raw=prompt("أدخل مبلغ الدين:"); if(raw===null)return; let amount=Number(raw); if(!Number.isFinite(amount)||amount<=0)return alert("أدخل مبلغاً صحيحاً أكبر من صفر");
   let id=Date.now(); debts.unshift({id,debtor:name,amount:+amount.toFixed(2),paid:0,date:new Date().toLocaleString("ar-IQ"),invoiceId:"DEBT-"+id,items:[]}); save(); debtsPage(); alert("تمت إضافة الدين على "+name);
 }
-function deleteDebtPerson(name){if(!confirm("حذف سجل ديون "+name+"؟"))return;debts=debts.filter(d=>d.debtor!==name);save();debtsPage()}
+function deleteDebtPerson(name){
+  if(!window.ownerMode)return alert("حذف الديون متاح لحساب المالك فقط");
+  if(!confirm("حذف سجل ديون "+name+"؟"))return;
+  debts=debts.filter(d=>d.debtor!==name);
+  save();
+  debtsPage();
+}
 function showDebtorDetails(name){let rows=debts.filter(d=>d.debtor===name);let body=`<h3>تفاصيل ديون: ${name}</h3><div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>المبلغ</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>${rows.map(d=>`<tr><td>${d.date||"—"}</td><td>${fmt(d.amount)}</td><td>${fmt(d.paid||0)}</td><td>${fmt(Math.max(0,d.amount-(d.paid||0)))}</td></tr>`).join("")}</tbody></table></div>`;document.getElementById("debtorDetails").innerHTML=body}
 function payDebt(name){
   let rows=debts.filter(d=>d.debtor===name&&Number(d.amount||0)>Number(d.paid||0)),remain=rows.reduce((a,d)=>a+Number(d.amount||0)-Number(d.paid||0),0);
