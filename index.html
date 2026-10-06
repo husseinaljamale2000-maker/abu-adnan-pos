@@ -37,7 +37,7 @@
 <header>
 <div class="brand" id="appTitle" title="5 نقرات لإظهار الإعدادات">
   <div class="aa-logo" aria-label="AA">AA</div>
-  <div class="brand-text"><h1>نظام الكاشير</h1><small>ABU ADNAN</small></div>
+  <div class="brand-text"><h1>نظام الكاشير</h1></div>
 </div>
 <input id="search" placeholder="ابحث عن منتج..." oninput="searchProducts()">
 <button class="gray" onclick="logout()">خروج</button>
@@ -51,6 +51,11 @@
 <button id="nav-notifications" onclick="page('notifications')">🔔 التنبيهات</button>
 <button id="nav-settings" onclick="page('settings')">🔐 الإعدادات</button>
 </nav>
+<div class="historybar" style="display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#f7f9fc;border-bottom:1px solid #dfe6ef">
+<button id="undoBtn" class="gray" onclick="undoAction()" disabled>↶ رجوع</button>
+<button id="redoBtn" class="gray" onclick="redoAction()" disabled>↷ تقدم</button>
+<span style="font-size:12px;color:#718096">تراجع أو تقدم عن آخر عملية محفوظة</span>
+</div>
 <main id="mainLayout">
 <section class="panel catalogpanel" id="work">
 <div class="head">
@@ -112,8 +117,31 @@ let cats=JSON.parse(localStorage.getItem("posBlank40Cats")||"null")||seed.map(c=
 if(localStorage.getItem("posBlank40ProductsClearedV1")!=="yes"){cats=cats.map(c=>({...c,products:[]}));localStorage.setItem("posBlank40ProductsClearedV1","yes");localStorage.setItem("posBlank40Cats",JSON.stringify(cats));}
 cats.forEach(c=>c.products.forEach(p=>{if(p.cost===undefined)p.cost=0;if(p.stock===undefined)p.stock=0;if(!p.unit)p.unit="piece"}));
 let cart=[],active=-1,current="sale",sales=JSON.parse(localStorage.getItem("posBlank40Sales")||"[]"),purchases=JSON.parse(localStorage.getItem("posBlank40Purchases")||"[]"),closedDays=JSON.parse(localStorage.getItem("posBlank40ClosedDays")||"[]"),debts=JSON.parse(localStorage.getItem("posBlank40Debts")||"[]"),activeSalesDay=localStorage.getItem("posBlank40ActiveSalesDay")||null;
+let purchaseDraftInvoiceNo=localStorage.getItem("posBlank40PurchaseDraftInvoiceNo")||null;
+let undoStack=[],redoStack=[],historyLast=null,historyReady=false,historyRestoring=false;
 if(localStorage.getItem("posBlank40FreshStartV27")!=="yes"){cats=cats.map(c=>({...c,products:[]}));sales=[];purchases=[];closedDays=[];debts=[];activeSalesDay=null;localStorage.setItem("posBlank40Cats",JSON.stringify(cats));localStorage.setItem("posBlank40Sales","[]");localStorage.setItem("posBlank40Purchases","[]");localStorage.setItem("posBlank40ClosedDays","[]");localStorage.setItem("posBlank40Debts","[]");localStorage.removeItem("posBlank40ActiveSalesDay");localStorage.setItem("posBlank40FreshStartV27","yes");}
-const todayKey=()=>{let d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};const fmt=n=>Math.round(n).toLocaleString("en-US")+" د.ع";const stockStatus=n=>n<=0?'<span class="stock-badge stock-none">لا يوجد</span>':n<5?'<span class="stock-badge stock-low">قليل</span>':'<span class="stock-badge stock-ok">متوفر</span>';function save(){localStorage.setItem("posBlank40Cats",JSON.stringify(cats));localStorage.setItem("posBlank40Sales",JSON.stringify(sales));localStorage.setItem("posBlank40Purchases",JSON.stringify(purchases));localStorage.setItem("posBlank40ClosedDays",JSON.stringify(closedDays));localStorage.setItem("posBlank40Debts",JSON.stringify(debts));if(activeSalesDay)localStorage.setItem("posBlank40ActiveSalesDay",activeSalesDay);else localStorage.removeItem("posBlank40ActiveSalesDay");if(window.autoSyncReady&&!window.applyingCloud)queueAutoPush()}
+const todayKey=()=>{let d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const fmt=n=>Math.round(Number(n)||0).toLocaleString("en-US")+" د.ع";
+const stockStatus=n=>n<=0?'<span class="stock-badge stock-none">لا يوجد</span>':n<5?'<span class="stock-badge stock-low">قليل</span>':'<span class="stock-badge stock-ok">متوفر</span>';
+function historySnapshot(){return {categories:JSON.parse(JSON.stringify(cats)),sales:JSON.parse(JSON.stringify(sales)),purchases:JSON.parse(JSON.stringify(purchases)),closedDays:JSON.parse(JSON.stringify(closedDays)),debts:JSON.parse(JSON.stringify(debts)),activeSalesDay, purchaseDraftInvoiceNo}}
+function historyKey(){return JSON.stringify(historySnapshot())}
+function updateHistoryButtons(){let u=document.getElementById("undoBtn"),r=document.getElementById("redoBtn");if(u){u.disabled=!undoStack.length;u.style.opacity=u.disabled?.5:1}if(r){r.disabled=!redoStack.length;r.style.opacity=r.disabled?.5:1}}
+function resetHistory(){historyLast=historyKey();undoStack=[];redoStack=[];updateHistoryButtons()}
+function save(){
+  if(historyReady&&!historyRestoring&&!window.applyingCloud){let now=historyKey();if(now!==historyLast){undoStack.push(JSON.parse(historyLast));if(undoStack.length>50)undoStack.shift();redoStack=[];historyLast=now;updateHistoryButtons()}}
+  localStorage.setItem("posBlank40Cats",JSON.stringify(cats));
+  localStorage.setItem("posBlank40Sales",JSON.stringify(sales));
+  localStorage.setItem("posBlank40Purchases",JSON.stringify(purchases));
+  localStorage.setItem("posBlank40ClosedDays",JSON.stringify(closedDays));
+  localStorage.setItem("posBlank40Debts",JSON.stringify(debts));
+  if(activeSalesDay)localStorage.setItem("posBlank40ActiveSalesDay",activeSalesDay);else localStorage.removeItem("posBlank40ActiveSalesDay");
+  if(purchaseDraftInvoiceNo)localStorage.setItem("posBlank40PurchaseDraftInvoiceNo",purchaseDraftInvoiceNo);else localStorage.removeItem("posBlank40PurchaseDraftInvoiceNo");
+  if(window.autoSyncReady&&!window.applyingCloud)queueAutoPush()
+}
+function applyHistoryState(st){if(!st)return;cats=JSON.parse(JSON.stringify(st.categories||[]));sales=JSON.parse(JSON.stringify(st.sales||[]));purchases=JSON.parse(JSON.stringify(st.purchases||[]));closedDays=JSON.parse(JSON.stringify(st.closedDays||[]));debts=JSON.parse(JSON.stringify(st.debts||[]));activeSalesDay=st.activeSalesDay||null;purchaseDraftInvoiceNo=st.purchaseDraftInvoiceNo||null;historyRestoring=true;save();historyRestoring=false;historyLast=historyKey();page(current);renderCart();updateHistoryButtons()}
+function undoAction(){if(!undoStack.length)return;let currentState=JSON.parse(historyLast);let target=undoStack.pop();redoStack.push(currentState);applyHistoryState(target)}
+function redoAction(){if(!redoStack.length)return;let currentState=JSON.parse(historyLast);let target=redoStack.pop();undoStack.push(currentState);applyHistoryState(target)}
+function initHistory(){historyReady=true;resetHistory();document.addEventListener("keydown",e=>{let tag=(e.target?.tagName||"").toLowerCase();if(tag==="input"||tag==="textarea"||tag==="select")return;if(e.ctrlKey&&!e.shiftKey&&e.key.toLowerCase()==="z"){e.preventDefault();undoAction()}else if((e.ctrlKey&&e.key.toLowerCase()==="y")||(e.ctrlKey&&e.shiftKey&&e.key.toLowerCase()==="z")){e.preventDefault();redoAction()}})}
 const SUPABASE_URL="https://oyvviixvtyttgvavevwe.supabase.co";const SUPABASE_PUBLISHABLE_KEY="sb_publishable_vp57f384wJ1wt-HBL5nyxw_AVp1ctau";
 function cloudHeaders(token){return {"apikey":SUPABASE_PUBLISHABLE_KEY,"Authorization":"Bearer "+token,"Content-Type":"application/json"}}
 async function getShopContext(token){
@@ -130,14 +158,14 @@ function cloudMessage(msg,isError=false){let el=document.getElementById("cloudSt
 async function cloudLogin(){let email=document.getElementById("cloudEmail")?.value.trim(),password=document.getElementById("cloudPassword")?.value;if(!email||!password)return alert("أدخل البريد الإلكتروني وكلمة مرور Supabase");cloudMessage("جارٍ تسجيل الدخول...");try{let r=await fetch(SUPABASE_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify({email,password})});let d=await r.json();if(!r.ok)throw Error(d.msg||d.message||d.error_description||"تعذر تسجيل الدخول");localStorage.setItem("posBlank40CloudAccess",d.access_token);localStorage.setItem("posBlank40CloudRefresh",d.refresh_token);localStorage.setItem("posBlank40CloudRefreshKeep",d.refresh_token);localStorage.setItem("posBlank40CloudUid",d.user.id);document.getElementById("cloudPassword").value="";cloudMessage("تم تسجيل الدخول سحابيًا بالحساب: "+email);alert("تم تسجيل الدخول السحابي بنجاح")}catch(e){cloudMessage("فشل تسجيل الدخول: "+e.message,true);alert("تعذر تسجيل الدخول: "+e.message)}}
 async function cloudToken(){let token=localStorage.getItem("posBlank40CloudAccess"),refresh=localStorage.getItem("posBlank40CloudRefresh")||localStorage.getItem("posBlank40CloudRefreshKeep");if(!token&&refresh){/* restore the previous cloud session when switching to owner mode */}if(!refresh)throw Error("سجّل الدخول السحابي أولاً من الإعدادات");try{let r=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:cloudHeaders(token)});if(r.ok)return token}catch(e){}let r=await fetch(SUPABASE_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:refresh})});let d=await r.json();if(!r.ok)throw Error(d.msg||d.message||"انتهت الجلسة، سجّل الدخول مجددًا");localStorage.setItem("posBlank40CloudAccess",d.access_token);localStorage.setItem("posBlank40CloudRefresh",d.refresh_token);localStorage.setItem("posBlank40CloudRefreshKeep",d.refresh_token);localStorage.setItem("posBlank40CloudUid",d.user.id);return d.access_token}
 const DATA_RESET_VERSION="abuAdnanFreshStartV1";
-function resetBusinessData(){cats=cats.map(c=>({...c,products:[]}));sales=[];purchases=[];closedDays=[];debts=[];activeSalesDay=null;localStorage.setItem("posBlank40Cats",JSON.stringify(cats));localStorage.setItem("posBlank40Sales","[]");localStorage.setItem("posBlank40Purchases","[]");localStorage.setItem("posBlank40ClosedDays","[]");localStorage.setItem("posBlank40Debts","[]");localStorage.removeItem("posBlank40ActiveSalesDay");}
-function localSnapshot(){return {version:1,__freshStartVersion:DATA_RESET_VERSION,categories:cats,sales,purchases,closedDays,debts,activeSalesDay,sectionPassword:localStorage.getItem("posBlank40SectionPass")||"",exportedAt:new Date().toISOString()}}
+function resetBusinessData(){cats=cats.map(c=>({...c,products:[]}));sales=[];purchases=[];closedDays=[];debts=[];activeSalesDay=null;purchaseDraftInvoiceNo=null;localStorage.setItem("posBlank40Cats",JSON.stringify(cats));localStorage.setItem("posBlank40Sales","[]");localStorage.setItem("posBlank40Purchases","[]");localStorage.setItem("posBlank40ClosedDays","[]");localStorage.setItem("posBlank40Debts","[]");localStorage.removeItem("posBlank40ActiveSalesDay");localStorage.removeItem("posBlank40PurchaseDraftInvoiceNo");if(typeof resetHistory==="function")resetHistory()}
+function localSnapshot(){return {version:1,__freshStartVersion:DATA_RESET_VERSION,categories:cats,sales,purchases,closedDays,debts,activeSalesDay,purchaseDraftInvoiceNo,sectionPassword:localStorage.getItem("posBlank40SectionPass")||"",exportedAt:new Date().toISOString()}}
 async function cloudPush(){if(!confirm("سيتم رفع بيانات هذا الجهاز إلى الحساب السحابي. إذا كانت هناك بيانات سحابية سابقة فسيتم استبدالها. هل أنشأت نسخة احتياطية وتريد المتابعة؟"))return;cloudMessage("جارٍ رفع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId"),uid=localStorage.getItem("posBlank40CloudUid");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=id&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId),r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة الجدول");let body={shop_id:shopId,entity_type:"app_state",entity_id:shopId,payload:localSnapshot(),updated_at:new Date().toISOString(),updated_by:uid};if(rows.length){r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync?id=eq."+encodeURIComponent(rows[0].id),{method:"PATCH",headers:{...cloudHeaders(token),"Prefer":"return=minimal"},body:JSON.stringify(body)})}else{r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync",{method:"POST",headers:{...cloudHeaders(token),"Prefer":"return=minimal"},body:JSON.stringify(body)})}if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر حفظ البيانات. تحقق من سياسات RLS")};cloudMessage("تم رفع البيانات إلى السحابة بنجاح.");alert("تم رفع بيانات الكاشير بنجاح")}catch(e){cloudMessage("فشل رفع البيانات: "+e.message,true);alert("فشل رفع البيانات: "+e.message)}}
-async function cloudPull(){if(!confirm("سيتم استبدال بيانات هذا الجهاز بالبيانات الموجودة في السحابة. يُفضّل تصدير نسخة احتياطية أولاً. هل تريد المتابعة؟"))return;cloudMessage("جارٍ استرجاع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=payload&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId)+"&limit=1",r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة البيانات");if(!rows.length)throw Error("لا توجد نسخة سحابية لهذا المتجر.");let d=rows[0].payload;if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");cats=d.categories;sales=d.sales;purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();page("sale");showCats();renderCart();cloudMessage("تم استرجاع البيانات السحابية بنجاح.");alert("تم استرجاع بيانات المتجر بنجاح")}catch(e){cloudMessage("فشل الاسترجاع: "+e.message,true);alert("فشل استرجاع البيانات: "+e.message)}}
+async function cloudPull(){if(!confirm("سيتم استبدال بيانات هذا الجهاز بالبيانات الموجودة في السحابة. يُفضّل تصدير نسخة احتياطية أولاً. هل تريد المتابعة؟"))return;cloudMessage("جارٍ استرجاع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=payload&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId)+"&limit=1",r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة البيانات");if(!rows.length)throw Error("لا توجد نسخة سحابية لهذا المتجر.");let d=rows[0].payload;if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();page("sale");showCats();renderCart();cloudMessage("تم استرجاع البيانات السحابية بنجاح.");alert("تم استرجاع بيانات المتجر بنجاح")}catch(e){cloudMessage("فشل الاسترجاع: "+e.message,true);alert("فشل استرجاع البيانات: "+e.message)}}
 let autoPushTimer=null,autoPullTimer=null;window.autoSyncReady=false;window.applyingCloud=false;window.autoSyncBusy=false;window.lastCloudStamp=localStorage.getItem("posBlank40CloudStamp")||"";
 async function readCloudState(token,shopId){let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=id,payload,updated_at&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId)+"&limit=1",r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة السحابة");return rows[0]||null}
 async function writeCloudState(token,shopId,uid){let row=await readCloudState(token,shopId),body={shop_id:shopId,entity_type:"app_state",entity_id:shopId,payload:localSnapshot(),updated_at:new Date().toISOString(),updated_by:uid};let url,method;if(row){if(window.lastCloudStamp&&row.updated_at!==window.lastCloudStamp)throw Error("CONFLICT");url=SUPABASE_URL+"/rest/v1/cashier_sync?id=eq."+encodeURIComponent(row.id);method="PATCH"}else{url=SUPABASE_URL+"/rest/v1/cashier_sync";method="POST"}let r=await fetch(url,{method,headers:{...cloudHeaders(token),"Prefer":"return=representation","Content-Type":"application/json"},body:JSON.stringify(body)});if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر حفظ السحابة")}let result=await r.json();window.lastCloudStamp=result?.[0]?.updated_at||body.updated_at;localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp)}
-function applyCloudState(d){if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;page(current);renderCart()}
+function applyCloudState(d){if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();page(current);renderCart()}
 function queueAutoPush(){if(!window.autoSyncReady||window.autoSyncBusy)return;clearTimeout(autoPushTimer);autoPushTimer=setTimeout(async()=>{autoPushTimer=null;if(!window.autoSyncReady)return;window.autoSyncBusy=true;try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId"),uid=localStorage.getItem("posBlank40CloudUid");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}await writeCloudState(token,shopId,uid);cloudMessage("☁️ تمت المزامنة التلقائية",false)}catch(e){cloudMessage(e.message==="CONFLICT"?"يوجد تعديل من جهاز آخر؛ أوقفنا الرفع لحماية البيانات. حدّث البيانات من السحابة بعد حفظ نسخة احتياطية.":"تعذرت المزامنة: "+e.message,true)}finally{window.autoSyncBusy=false}},1200)}
 async function initializeAutoSync(){if(!localStorage.getItem("posBlank40CloudAccess"))throw Error("سجّل الدخول أولاً");cloudMessage("جارٍ ربط الحساب والمزامنة تلقائياً...");let token=await cloudToken(),ctx=await getShopContext(token),shopId=ctx.shop_id,uid=localStorage.getItem("posBlank40CloudUid");let row=await readCloudState(token,shopId);if(row&&row.payload&&row.payload.__freshStartVersion===DATA_RESET_VERSION){applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at)}else{let keepPass=(row&&typeof row.payload?.sectionPassword==="string"&&row.payload.sectionPassword)?row.payload.sectionPassword:(localStorage.getItem("posBlank40SectionPass")||"");resetBusinessData();if(keepPass)localStorage.setItem("posBlank40SectionPass",keepPass);window.lastCloudStamp=row?.updated_at||"";await writeCloudState(token,shopId,uid);localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp);cloudMessage("تم بدء المتجر ببيانات فارغة جديدة.",false)}window.autoSyncReady=true;localStorage.setItem("posBlank40AutoSync","yes");if(autoPullTimer)clearInterval(autoPullTimer);autoPullTimer=setInterval(autoPullCheck,10000);cloudMessage("☁️ تم ربط الحساب والمزامنة التلقائية",false)}
 async function autoPullCheck(){if(!window.autoSyncReady||window.autoSyncBusy)return;window.autoSyncBusy=true;try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let row=await readCloudState(token,shopId);if(row&&row.updated_at!==window.lastCloudStamp){if(autoPushTimer){clearTimeout(autoPushTimer);autoPushTimer=null;cloudMessage("تغيير سحابي جديد؛ أوقفنا المزامنة التلقائية مؤقتاً لتجنب استبدال تعديلات هذا الجهاز.",true);window.autoSyncReady=false;return}applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at);cloudMessage("☁️ استُقبل تحديث من جهاز آخر",false)}}catch(e){cloudMessage("تعذر فحص التحديثات: "+e.message,true)}finally{window.autoSyncBusy=false}}
@@ -311,7 +339,7 @@ async function resetEntireBusinessAccount(){
     if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر تصفير البيانات السحابية")}
     window.applyingCloud=false;
     window.lastCloudStamp=body.updated_at;localStorage.setItem("posBlank40CloudStamp",body.updated_at);
-    page("sale");showCats();renderCart();cloudMessage("☁️ تم تصفير بيانات المتجر بنجاح",false);
+    resetHistory();page("sale");showCats();renderCart();cloudMessage("☁️ تم تصفير بيانات المتجر بنجاح",false);
     alert("تم تصفير الحساب بنجاح. حساب المالك وربط المتجر بقيا محفوظين، والبرنامج جاهز للبدء من جديد.");
   }catch(e){window.applyingCloud=false;alert("تعذر تصفير الحساب: "+e.message)}
 }
@@ -389,7 +417,22 @@ function renderCart(){let el=document.getElementById("cart");el.innerHTML="";car
 </div>
 <b>${fmt(p.price*p.qty)}</b>`;el.appendChild(d)});let sub=cart.reduce((s,p)=>s+p.price*p.qty,0),disc=Math.max(0,+document.getElementById("discount").value||0);document.getElementById("subtotal").textContent=fmt(sub);document.getElementById("total").textContent=fmt(Math.max(0,sub-disc))}
 function qty(i,d){let item=cart[i],p=cats[item.ci].products[item.pi],next=+(item.qty+d).toFixed(2);if(d>0&&cart.filter((x,j)=>j!==i&&x.ci===item.ci&&x.pi===item.pi).reduce((sum,x)=>sum+x.qty,0)+next>p.stock)return alert("لا يمكن تجاوز الكمية المتوفرة ("+p.stock+")");item.qty=next;if(item.qty<=0)cart.splice(i,1);renderCart()}function removeItem(i){cart.splice(i,1);renderCart()}function clearCart(){if(cart.length&&!confirm("مسح الفاتورة؟"))return;cart=[];document.getElementById("discount").value=0;renderCart()}
-function pay(method){if(!cart.length)return alert("الفاتورة فارغة");let debtor="";if(method==="دين"){debtor=prompt("أدخل اسم الشخص المدين:");if(debtor===null)return;debtor=debtor.trim();if(!debtor)return alert("اسم الشخص مطلوب لتسجيل الدين")}for(let x of cart){let p=cats[x.ci].products[x.pi];if(p.stock<x.qty&&!confirm(`المتوفر من ${p.name} هو ${p.stock} فقط. هل تريد إكمال البيع ويصبح المخزون سالباً؟`))return}let sub=cart.reduce((s,p)=>s+p.price*p.qty,0),discount=Math.max(0,+document.getElementById("discount").value||0),total=Math.max(0,sub-discount),profit=cart.reduce((s,x)=>s+(x.price-x.cost)*x.qty,0)-discount,id=Date.now(),date=new Date().toLocaleString("ar-IQ");cart.forEach(x=>cats[x.ci].products[x.pi].stock-=x.qty);sales.unshift({id,dayKey:(activeSalesDay||todayKey()),date,method,debtor:method==="دين"?debtor:"",items:cart.map(x=>({...x})),subtotal:sub,discount,total,profit});if(method==="دين")debts.unshift({id,debtor,amount:total,paid:0,date,invoiceId:id});save();alert((method==="دين"?"تم تسجيل الدين باسم "+debtor+"\\n":"تم تسجيل الفاتورة\\n")+"الإجمالي: "+fmt(total)+"\\nالربح التقديري: "+fmt(profit));clearCart();if(current==="sale")showCats()}
+function salesSessionDate(key){return String(key||todayKey()).split("::")[0]}
+function salesSessionNumber(key){let m=String(key||"").match(/::(\d+)$/);return m?Number(m[1]):1}
+function nextSalesSessionKey(date=todayKey()){
+  let nums=[];
+  closedDays.forEach(d=>{if(salesSessionDate(d.dayKey)===date)nums.push(salesSessionNumber(d.dayKey))});
+  sales.forEach(x=>{if(salesSessionDate(x.dayKey)===date)nums.push(salesSessionNumber(x.dayKey))});
+  let n=Math.max(0,...nums)+1;
+  return date+"::"+n;
+}
+function ensureActiveSalesSession(){
+  let date=todayKey();
+  if(activeSalesDay&&salesSessionDate(activeSalesDay)===date)return activeSalesDay;
+  activeSalesDay=closedDays.some(d=>salesSessionDate(d.dayKey)===date)?nextSalesSessionKey(date):date;
+  return activeSalesDay;
+}
+function pay(method){if(!cart.length)return alert("الفاتورة فارغة");let debtor="";if(method==="دين"){debtor=prompt("أدخل اسم الشخص المدين:");if(debtor===null)return;debtor=debtor.trim();if(!debtor)return alert("اسم الشخص مطلوب لتسجيل الدين")}for(let x of cart){let p=cats[x.ci].products[x.pi];if(p.stock<x.qty&&!confirm(`المتوفر من ${p.name} هو ${p.stock} فقط. هل تريد إكمال البيع ويصبح المخزون سالباً؟`))return}let sub=cart.reduce((s,p)=>s+p.price*p.qty,0),discount=Math.max(0,+document.getElementById("discount").value||0),total=Math.max(0,sub-discount),profit=cart.reduce((s,x)=>s+(x.price-x.cost)*x.qty,0)-discount,id=Date.now(),date=new Date().toLocaleString("ar-IQ"),sessionKey=ensureActiveSalesSession();cart.forEach(x=>cats[x.ci].products[x.pi].stock-=x.qty);sales.unshift({id,dayKey:sessionKey,date,method,debtor:method==="دين"?debtor:"",items:cart.map(x=>({...x})),subtotal:sub,discount,total,profit});if(method==="دين")debts.unshift({id,debtor,amount:total,paid:0,date,invoiceId:id});save();alert((method==="دين"?"تم تسجيل الدين باسم "+debtor+"\n":"تم تسجيل الفاتورة\n")+"الإجمالي: "+fmt(total)+"\nالربح التقديري: "+fmt(profit));clearCart();if(current==="sale")showCats()}
 function openModal(){document.getElementById("modal").classList.add("show")}function closeModal(){document.getElementById("modal").classList.remove("show")}function openHelp(){let title="تعليمات الاستخدام",body="";if(current==="sale"){title="تعليمات الكاشير";body=`<ol>
 <li>اختر القسم من واجهة الكاشير.</li>
 <li>اضغط على المنتج لإضافته إلى الفاتورة.</li>
@@ -406,10 +449,9 @@ function openModal(){document.getElementById("modal").classList.add("show")}func
 <li>أدخل عدد الكراتين أو الباكيتات المشتراة، وعدد الوحدات داخل كل عبوة.</li>
 <li>أدخل سعر شراء العبوة بالكامل؛ يحسب البرنامج تكلفة الوحدة تلقائياً.</li>
 <li>أدخل سعر بيع الوحدة الذي تحدده، وسيظهر ربح الوحدة وربح العبوة وإجمالي الربح المتوقع.</li>
-<li>اضغط «تسجيل المشتريات وإضافة للمخزون» لحفظ العملية وتحديث الكمية.</li>
+<li>رقم الفاتورة يتولد تلقائياً، وكل منتج تضيفه يبقى على نفس الفاتورة الحالية حتى تضغط «إغلاق الفاتورة وفتح رقم جديد».</li><li>يمكنك تعديل أي منتج من زر «✏️ تعديل» مع إعادة حساب الكمية والتكلفة والربح.</li>
 </ol>`}else if(current==="sales"){title="تعليمات سجل المبيعات";body=`<ol>
-<li>يعرض السجل الفواتير المسجلة وإجمالي المبيعات والأرباح.</li>
-<li>اضغط على أي فاتورة لعرض تفاصيل المنتجات والكميات والأسعار.</li>
+<li>يعرض السجل حساب الفاتورة الحالية فقط.</li><li>عند إغلاق الحساب تصبح الحسابات الحالية صفراً، وتبقى الفواتير محفوظة في سجل الإغلاقات.</li><li>يمكنك إعادة فتح أي حساب مغلق من سجل الإغلاقات.</li>
 </ol>`}else{title="تعليمات إدارة المنتجات";body=`<p>من هذه النافذة يمكنك إضافة الأقسام والمنتجات وتعديل بياناتها أو حذفها.</p>`}document.getElementById("modalTitle").textContent=title;document.getElementById("modalBody").innerHTML=body;openModal()}
 function openAdmin(authorized=false){if(!window.ownerMode&&!authorized&&!sectionUnlocked()){requestSectionPassword(()=>openAdmin(true));return}document.getElementById("modalTitle").textContent="إدارة المنتجات والأقسام";adminView();openModal()}
 function adminView(){let b=document.getElementById("modalBody");b.innerHTML=`<h3>إضافة قسم</h3>
@@ -583,151 +625,117 @@ let stockActive=-1;function stockBack(){if(current!=="stock"){showCats();return}
 <td colspan="4">لا توجد منتجات ضمن هذه القائمة</td>
 </tr>`}</tbody>
 </table>
-</div>`}function showStockCat(i){stockActive=i;stockPage()}function showPurchaseDetail(i){let x=purchases[i];if(!x)return;let total=x.totalCost??x.qty*x.cost,unitCost=x.cost??(x.packSize?total/x.qty:0),sale=x.salePrice??(x.qty?((x.expectedProfit??0)/x.qty+unitCost):0),profit=x.expectedProfit??((sale-unitCost)*x.qty);document.getElementById("modalTitle").textContent="تفاصيل فاتورة المشتريات رقم "+(x.invoiceNo||purchases.length-i);document.getElementById("modalBody").innerHTML=`<div class="cards">
-<div class="stat">
-<span>المنتج</span>
-<b>${x.name}</b>
-</div>
-<div class="stat">
-<span>القسم</span>
-<b>${x.category||"—"}</b>
-</div>
-<div class="stat">
-<span>تاريخ الفاتورة</span>
-<b>${x.date}</b>
-</div>
-<div class="stat">
-<span>المورد</span>
-<b>${x.supplier||"—"}</b>
-</div>
-<div class="stat">
-<span>عدد الكراتين / الباكيتات</span>
-<b>${x.packQty??x.qty}</b>
-</div>
-<div class="stat">
-<span>الوحدات داخل العبوة</span>
-<b>${x.packSize??1}</b>
-</div>
-<div class="stat">
-<span>الكمية المضافة للمخزون</span>
-<b>${x.qty}</b>
-</div>
-<div class="stat">
-<span>تكلفة شراء الوحدة</span>
-<b>${fmt(unitCost)}</b>
-</div>
-<div class="stat">
-<span>سعر بيع الوحدة</span>
-<b>${fmt(sale)}</b>
-</div>
-<div class="stat">
-<span>إجمالي تكلفة الفاتورة</span>
-<b>${fmt(total)}</b>
-</div>
-<div class="stat">
-<span>الربح المتوقع للوحدة</span>
-<b>${fmt(sale-unitCost)}</b>
-</div>
-<div class="stat">
-<span>إجمالي الربح المتوقع</span>
-<b style="color:${profit<0?"#bd3d26":"#159447"}">${fmt(profit)}</b>
-</div>
-</div>
-<p class="muted">الربح المتوقع محسوب على أساس بيع كامل الكمية بسعر البيع المحدد، ولا يشمل المصاريف الإضافية.</p>`;openModal()}function nextPurchaseInvoiceNo(){let nums=purchases.map(x=>Number(x.invoiceNo)).filter(n=>Number.isInteger(n)&&n>0);return String(Math.max(purchases.length,...nums,0)+1)}function purchasePage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="تسجيل مشتريات / توريد مخزون";document.getElementById("hint").textContent="اختر القسم والمنتج، ثم أدخل تفاصيل العبوة وأسعار الشراء والبيع";let catOpts=cats.map((c,i)=>`<option value="${i}">${c.name}</option>`).join("");document.getElementById("catalog").innerHTML=`<div class="fields">
-<label style="grid-column:1/-1">🔢 رقم فاتورة الشراء<input id="buyInvoiceNo" type="text" value="${nextPurchaseInvoiceNo()}" placeholder="رقم الفاتورة" autocomplete="off">
-</label>
-</div>
-<div class="fields" autocomplete="off">
-<label>القسم الرئيسي<select id="buyCat" onchange="purchaseCategoryChanged()">${catOpts}</select>
-</label>
-<label>المنتج<select id="buyProd" onchange="purchaseProductChanged()">
-</select>
-</label>
-</div>
-<div id="buyForm" style="margin-top:12px" autocomplete="off">
-<div class="fields">
-<label id="newNameLabel">اسم المنتج الجديد<input id="buyNewName" placeholder="مثلاً: مارلبورو أحمر">
-</label>
-<label>عدد الكراتين / الباكيتات المشتراة<input id="buyPacks" type="number" min=".01" step=".01" value="1">
-</label>
-<label>عدد العلب / الوحدات داخل الكرتون أو الباكيت<input id="buyPackSize" type="number" min=".001" step=".001" value="1">
-</label>
-<label>سعر شراء الكرتون / الباكيت بالكامل (د.ع)<input id="buyPackCost" type="number" min="0" value="0">
-</label>
-<label>تكلفة شراء العلبة / الوحدة الواحدة (تُحسب تلقائياً)<input id="buyUnitCostCalc" type="text" readonly value="0 د.ع">
-</label>
-<label>سعر بيع العلبة / الوحدة الواحدة (د.ع)<input id="buyUnitPrice" type="number" min="0" value="0">
-</label>
-<label>وحدة المخزون<select id="buyUnit">
-<option value="piece">قطعة / علبة</option>
-<option value="kg">كغم</option>
-</select>
-</label>
-<label>اسم المورد (اختياري)<input id="supplier" placeholder="اسم المورد">
-</label>
-<label>حد تنبيه المخزون<input id="buyAlertThreshold" type="number" min="0" step="1" value="0" placeholder="مثلاً 5">
-</label>
-</div>
-<div class="cards" style="margin-top:12px">
-<div class="stat">
-<span>الكمية التي ستضاف للمخزون</span>
-<b id="buyPreviewQty">1 قطعة</b>
-</div>
-<div class="stat">
-<span>تكلفة شراء الوحدة الواحدة</span>
-<b id="buyPreviewCost">0 د.ع</b>
-</div>
-<div class="stat">
-<span>ربح الكرتون / الباكيت الواحد</span>
-<b id="buyPreviewPackProfit">0 د.ع</b>
-</div>
-<div class="stat">
-<span>صافي الربح المتوقع لكل الكمية المشتراة</span>
-<b id="buyPreviewTotalProfit">0 د.ع</b>
-</div>
-<div class="stat">
-<span>إجمالي فاتورة الشراء</span>
-<b id="buyPreviewTotal">0 د.ع</b>
-</div>
-</div>
-<div class="actions">
-<button class="green" onclick="recordPurchase()">تسجيل المشتريات وإضافة للمخزون</button>
-<button class="red" onclick="clearPurchaseForm()">🗑️ مسح خانات الشراء</button>
-</div>
-</div>
-<h3>آخر المشتريات</h3>
-<div class="tablewrap">
-<table>
-<thead>
-<tr>
-<th>رقم الفاتورة</th>
-<th>التاريخ</th>
-<th>المنتج</th>
-<th>العبوات</th>
-<th>الوحدات/عبوة</th>
-<th>الكمية المضافة</th>
-<th>تكلفة الوحدة</th>
-<th>الإجمالي</th>
-<th>المورد</th>
-</tr>
-</thead>
-<tbody>${purchases.slice(0,100).map((x,i)=>`<tr onclick="showPurchaseDetail(${i})" style="cursor:pointer" title="اضغط لعرض تفاصيل الفاتورة">
-<td>${x.invoiceNo||purchases.length-i}</td>
-<td>${x.date}</td>
-<td>${x.name}</td>
-<td>${x.packQty??x.qty}</td>
-<td>${x.packSize??1}</td>
-<td>${x.qty}</td>
-<td>${fmt(x.cost)}</td>
-<td>${fmt(x.totalCost??x.qty*x.cost)}</td>
-<td>${x.supplier||"—"}</td>
-</tr>`).join("")||'<tr><td colspan="9">لا توجد مشتريات مسجلة بعد</td></tr>'}</tbody>
-</table>
-</div>`;purchaseCategoryChanged();["buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnit"].forEach(id=>document.getElementById(id).addEventListener("input",updatePurchasePreview));}
-function purchaseCategoryChanged(){let ci=+document.getElementById("buyCat").value,sel=document.getElementById("buyProd");sel.innerHTML=cats[ci].products.map((p,pi)=>`<option value="${pi}">${p.name}</option>`).join("")+'<option value="new">＋ إضافة منتج جديد</option>';purchaseProductChanged()}
-function purchaseProductChanged(){let ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",p=isNew?null:cats[ci].products[+val];document.getElementById("newNameLabel").style.display=isNew?"block":"none";document.getElementById("buyNewName").value="";document.getElementById("buyPackSize").value="1";document.getElementById("buyPackCost").value=p? p.cost:0;document.getElementById("buyUnitPrice").value=p?p.price:0;document.getElementById("buyUnit").value=p?p.unit:"piece";document.getElementById("buyAlertThreshold").value=p?(p.alertThreshold??0):0;document.getElementById("buyPacks").value="1";updatePurchasePreview()}
+</div>`}function showStockCat(i){stockActive=i;stockPage()}function resolvePurchaseProduct(x){
+  if(x&&Number.isInteger(x.ci)&&Number.isInteger(x.pi)&&cats[x.ci]?.products[x.pi])return {p:cats[x.ci].products[x.pi],ci:x.ci,pi:x.pi};
+  let ci=cats.findIndex(c=>c.name===x?.category),pi=-1;
+  if(ci>=0)pi=cats[ci].products.findIndex(p=>p.name===x.name);
+  if(ci>=0&&pi>=0)return {p:cats[ci].products[pi],ci,pi};
+  return null;
+}
+function nextPurchaseInvoiceNo(){let nums=purchases.map(x=>Number(x.invoiceNo)).filter(n=>Number.isInteger(n)&&n>0);return String(Math.max(0,...nums)+1)}
+function ensurePurchaseDraft(){if(!purchaseDraftInvoiceNo)purchaseDraftInvoiceNo=nextPurchaseInvoiceNo();return String(purchaseDraftInvoiceNo)}
+function purchaseInvoiceRows(invoiceNo){return purchases.map((x,i)=>({x,i})).filter(({x})=>String(x.invoiceNo)===String(invoiceNo))}
+function purchaseInvoiceTotal(invoiceNo){return purchaseInvoiceRows(invoiceNo).reduce((a,{x})=>a+Number(x.totalCost??(x.qty||0)*(x.cost||0)),0)}
+function showPurchaseDetail(i){
+  let x=purchases[i];if(!x)return;
+  let invoiceNo=x.invoiceNo||"—",rows=purchaseInvoiceRows(invoiceNo),total=rows.reduce((a,{x})=>a+Number(x.totalCost??(x.qty||0)*(x.cost||0)),0),profit=rows.reduce((a,{x})=>a+Number(x.expectedProfit??0),0);
+  document.getElementById("modalTitle").textContent="تفاصيل فاتورة المشتريات رقم "+invoiceNo;
+  document.getElementById("modalBody").innerHTML=`
+  <div class="cards">
+    <div class="stat"><span>رقم الفاتورة</span><b>${invoiceNo}</b></div>
+    <div class="stat"><span>عدد المنتجات</span><b>${rows.length}</b></div>
+    <div class="stat"><span>إجمالي تكلفة الفاتورة</span><b>${fmt(total)}</b></div>
+    <div class="stat"><span>الربح المتوقع</span><b style="color:${profit<0?"#bd3d26":"#159447"}">${fmt(profit)}</b></div>
+  </div>
+  <div class="tablewrap"><table><thead><tr><th>المنتج</th><th>الكمية</th><th>تكلفة الوحدة</th><th>سعر البيع</th><th>الإجمالي</th><th>الإجراء</th></tr></thead><tbody>
+  ${rows.map(({x,i})=>`<tr><td><b>${x.name}</b></td><td>${x.qty}</td><td>${fmt(x.cost)}</td><td>${fmt(x.salePrice||0)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td><button class="blue" onclick="editPurchaseLine(${i})">✏️ تعديل</button></td></tr>`).join("")||'<tr><td colspan="6">لا توجد منتجات</td></tr>'}
+  </tbody><tfoot><tr><th colspan="4">إجمالي الفاتورة</th><th>${fmt(total)}</th><th></th></tr><tr><th colspan="4">الربح المتوقع</th><th>${fmt(profit)}</th><th></th></tr></tfoot></table></div>
+  <div class="actions"><button class="gray" onclick="closeModal()">إغلاق</button></div>`;
+  openModal();
+}
+function editPurchaseLine(i){
+  let x=purchases[i];if(!x)return;
+  let resolved=resolvePurchaseProduct(x);if(!resolved)return alert("تعذر العثور على المنتج المرتبط بهذه المشتريات");
+  let packs=x.packQty??x.qty,size=x.packSize??1,packCost=(x.totalCost!=null?x.totalCost:((x.cost||0)*(x.qty||0)))/(Number(size)||1),sale=x.salePrice??resolved.p.price,supplier=x.supplier||"",threshold=resolved.p.alertThreshold??0;
+  document.getElementById("modalTitle").textContent="✏️ تعديل منتج في فاتورة رقم "+(x.invoiceNo||"—");
+  document.getElementById("modalBody").innerHTML=`<p><b>${x.name}</b></p><div class="fields">
+  <label>عدد الكراتين / الباكيتات<input id="editBuyPacks" type="number" min=".01" step=".01" value="${packs}"></label>
+  <label>الوحدات داخل العبوة<input id="editBuyPackSize" type="number" min=".001" step=".001" value="${size}"></label>
+  <label>سعر شراء العبوة بالكامل (د.ع)<input id="editBuyPackCost" type="number" min="0" step=".01" value="${packCost}"></label>
+  <label>سعر بيع الوحدة (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>
+  <label>اسم المورد<input id="editBuySupplier" value="${String(supplier).replace(/"/g,'&quot;')}"></label>
+  <label>حد تنبيه المخزون<input id="editBuyThreshold" type="number" min="0" step="1" value="${threshold}"></label>
+  </div>
+  <div class="actions"><button class="green" onclick="savePurchaseLineEdit(${i})">💾 حفظ التعديل</button><button class="gray" onclick="showPurchaseDetail(${i})">إلغاء</button></div>`;
+  openModal();
+}
+function savePurchaseLineEdit(i){
+  let x=purchases[i];if(!x)return;
+  let resolved=resolvePurchaseProduct(x);if(!resolved)return alert("تعذر العثور على المنتج");
+  let packs=+document.getElementById("editBuyPacks").value,size=+document.getElementById("editBuyPackSize").value,packCost=+document.getElementById("editBuyPackCost").value,salePrice=+document.getElementById("editBuySalePrice").value,supplier=document.getElementById("editBuySupplier").value.trim(),threshold=+document.getElementById("editBuyThreshold").value||0;
+  if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(size)||size<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");
+  if(resolved.p.unit!==x.unit&&x.unit&&resolved.p.unit!==x.unit)return alert("وحدة المنتج غير متطابقة");
+  let oldQty=Number(x.qty)||0,newQty=+(packs*size).toFixed(3),unitCost=packCost/size;
+  resolved.p.stock=+(Number(resolved.p.stock||0)+newQty-oldQty).toFixed(3);
+  resolved.p.cost=unitCost;resolved.p.price=salePrice;resolved.p.alertThreshold=threshold;
+  x.ci=resolved.ci;x.pi=resolved.pi;x.packQty=packs;x.packSize=size;x.qty=newQty;x.cost=unitCost;x.totalCost=+(packs*packCost).toFixed(2);x.salePrice=salePrice;x.expectedProfit=+(salePrice-unitCost)*newQty;x.supplier=supplier;
+  save();let invoiceNo=x.invoiceNo;showPurchaseDetail(i);purchasePage();alert("تم تعديل المنتج وإعادة حساب كمية المخزون وإجمالي وربح الفاتورة رقم "+invoiceNo);
+}
+function closePurchaseInvoice(){
+  let invoiceNo=ensurePurchaseDraft(),rows=purchaseInvoiceRows(invoiceNo);
+  if(!rows.length)return alert("أضف منتجاً واحداً على الأقل قبل إغلاق الفاتورة");
+  let total=purchaseInvoiceTotal(invoiceNo);
+  if(!confirm("إغلاق فاتورة المشتريات رقم "+invoiceNo+" بإجمالي "+fmt(total)+"؟"))return;
+  purchaseDraftInvoiceNo=nextPurchaseInvoiceNo();save();purchasePage();alert("تم إغلاق فاتورة المشتريات رقم "+invoiceNo+" وفتح فاتورة جديدة رقم "+purchaseDraftInvoiceNo);
+}
+function purchasePage(){
+  let invoiceNo=ensurePurchaseDraft();
+  document.getElementById("catalog").className="";document.getElementById("heading").textContent="تسجيل مشتريات / توريد مخزون";document.getElementById("hint").textContent="رقم الفاتورة يتولد تلقائياً. أضف كل المنتجات على نفس الفاتورة ثم أغلقها عند الانتهاء";
+  let catOpts=cats.map((c,i)=>`<option value="${i}">${c.name}</option>`).join(""),currentRows=purchaseInvoiceRows(invoiceNo),currentTotal=currentRows.reduce((a,{x})=>a+Number(x.totalCost??(x.qty||0)*(x.cost||0)),0);
+  document.getElementById("catalog").innerHTML=`
+  <div class="cards">
+    <div class="stat"><span>🧾 الفاتورة الحالية</span><b>رقم ${invoiceNo}</b></div>
+    <div class="stat"><span>عدد المنتجات المضافة</span><b>${currentRows.length}</b></div>
+    <div class="stat"><span>إجمالي الفاتورة الحالية</span><b>${fmt(currentTotal)}</b></div>
+  </div>
+  <div class="actions" style="margin:0 0 12px"><button class="green" onclick="closePurchaseInvoice()" ${currentRows.length?"":"disabled"}>🔒 إغلاق الفاتورة وفتح رقم جديد</button></div>
+  <div class="fields"><label style="grid-column:1/-1">🔢 رقم فاتورة الشراء<input id="buyInvoiceNo" type="text" value="${invoiceNo}" readonly></label></div>
+  <div class="fields" autocomplete="off"><label>القسم الرئيسي<select id="buyCat" onchange="purchaseCategoryChanged()">${catOpts}</select></label><label>المنتج<select id="buyProd" onchange="purchaseProductChanged()"></select></label></div>
+  <div id="buyForm" style="margin-top:12px" autocomplete="off"><div class="fields">
+  <label id="newNameLabel">اسم المنتج الجديد<input id="buyNewName" placeholder="مثلاً: مارلبورو أحمر"></label>
+  <label>عدد الكراتين / الباكيتات المشتراة<input id="buyPacks" type="number" min=".01" step=".01" value="1"></label>
+  <label>عدد العلب / الوحدات داخل الكرتون أو الباكيت<input id="buyPackSize" type="number" min=".001" step=".001" value="1"></label>
+  <label>سعر شراء الكرتون / الباكيت بالكامل (د.ع)<input id="buyPackCost" type="number" min="0" value="0"></label>
+  <label>تكلفة شراء العلبة / الوحدة الواحدة (تُحسب تلقائياً)<input id="buyUnitCostCalc" type="text" readonly value="0 د.ع"></label>
+  <label>سعر بيع العلبة / الوحدة الواحدة (د.ع)<input id="buyUnitPrice" type="number" min="0" value="0"></label>
+  <label>وحدة المخزون<select id="buyUnit"><option value="piece">قطعة / علبة</option><option value="kg">كغم</option></select></label>
+  <label>اسم المورد (اختياري)<input id="supplier" placeholder="اسم المورد"></label>
+  <label>حد تنبيه المخزون<input id="buyAlertThreshold" type="number" min="0" step="1" value="0" placeholder="مثلاً 5"></label>
+  </div>
+  <div class="cards" style="margin-top:12px"><div class="stat"><span>الكمية التي ستضاف للمخزون</span><b id="buyPreviewQty">1 قطعة</b></div><div class="stat"><span>تكلفة شراء الوحدة الواحدة</span><b id="buyPreviewCost">0 د.ع</b></div><div class="stat"><span>ربح الكرتون / الباكيت الواحد</span><b id="buyPreviewPackProfit">0 د.ع</b></div><div class="stat"><span>صافي الربح المتوقع لكل الكمية المشتراة</span><b id="buyPreviewTotalProfit">0 د.ع</b></div><div class="stat"><span>إجمالي هذه العملية</span><b id="buyPreviewTotal">0 د.ع</b></div></div>
+  <div class="actions"><button class="green" onclick="recordPurchase()">➕ إضافة المنتج إلى الفاتورة</button><button class="red" onclick="clearPurchaseForm()">🗑️ مسح خانات المنتج</button></div></div>
+  <h3>منتجات الفاتورة الحالية رقم ${invoiceNo}</h3>
+  <div class="tablewrap"><table><thead><tr><th>المنتج</th><th>الكمية</th><th>تكلفة الوحدة</th><th>سعر البيع</th><th>الإجمالي</th><th>الإجراء</th></tr></thead><tbody>
+  ${currentRows.map(({x,i})=>`<tr><td><b>${x.name}</b></td><td>${x.qty}</td><td>${fmt(x.cost)}</td><td>${fmt(x.salePrice||0)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td><button class="blue" onclick="editPurchaseLine(${i})">✏️ تعديل</button></td></tr>`).join("")||'<tr><td colspan="6">لم تضف أي منتج إلى هذه الفاتورة بعد.</td></tr>'}
+  </tbody><tfoot><tr><th colspan="4">إجمالي الفاتورة الحالية</th><th>${fmt(currentTotal)}</th><th></th></tr></tfoot></table></div>
+  <h3>سجل المشتريات السابق</h3><div class="tablewrap"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>المنتج</th><th>العبوات</th><th>الوحدات/عبوة</th><th>الكمية</th><th>تكلفة الوحدة</th><th>الإجمالي</th><th>المورد</th></tr></thead><tbody>
+  ${purchases.slice(0,100).map((x,i)=>`<tr onclick="showPurchaseDetail(${i})" style="cursor:pointer" title="اضغط لعرض تفاصيل الفاتورة"><td>${x.invoiceNo||purchases.length-i}</td><td>${x.date}</td><td>${x.name}</td><td>${x.packQty??x.qty}</td><td>${x.packSize??1}</td><td>${x.qty}</td><td>${fmt(x.cost)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td>${x.supplier||"—"}</td></tr>`).join("")||'<tr><td colspan="9">لا توجد مشتريات مسجلة بعد</td></tr>'}</tbody></table></div>`;
+  purchaseCategoryChanged();
+  ["buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnit"].forEach(id=>document.getElementById(id).addEventListener("input",updatePurchasePreview));
+}
+function purchaseCategoryChanged(){let ci=+document.getElementById("buyCat").value,sel=document.getElementById("buyProd");sel.innerHTML=cats[ci].products.map((p,pi)=>`<option value="${pi}">${p.name}</option>`).join("")+`<option value="new">＋ إضافة منتج جديد</option>`;purchaseProductChanged()}
+function purchaseProductChanged(){let ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",p=isNew?null:cats[ci].products[+val];document.getElementById("newNameLabel").style.display=isNew?"block":"none";document.getElementById("buyNewName").value="";document.getElementById("buyPackSize").value="1";document.getElementById("buyPackCost").value=p?p.cost:0;document.getElementById("buyUnitPrice").value=p?p.price:0;document.getElementById("buyUnit").value=p?p.unit:"piece";document.getElementById("buyAlertThreshold").value=p?(p.alertThreshold??0):0;document.getElementById("buyPacks").value="1";updatePurchasePreview()}
 function updatePurchasePreview(){let packs=+document.getElementById("buyPacks").value||0,size=+document.getElementById("buyPackSize").value||0,cost=+document.getElementById("buyPackCost").value||0,sale=+document.getElementById("buyUnitPrice").value||0,qty=packs*size,unitCost=size?cost/size:0,unitProfit=sale-unitCost,packProfit=unitProfit*size,totalProfit=unitProfit*qty,unit=document.getElementById("buyUnit").value;document.getElementById("buyPreviewQty").textContent=qty.toLocaleString("en-US")+" "+(unit==="kg"?"كغم":"قطعة");document.getElementById("buyPreviewCost").textContent=fmt(unitCost);document.getElementById("buyUnitCostCalc").value=fmt(unitCost);document.getElementById("buyPreviewPackProfit").textContent=fmt(packProfit);document.getElementById("buyPreviewTotalProfit").textContent=fmt(totalProfit);document.getElementById("buyPreviewTotal").textContent=fmt(packs*cost)}
-function recordPurchase(){let invoiceNo=document.getElementById("buyInvoiceNo").value.trim(),ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",name=isNew?document.getElementById("buyNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],packs=+document.getElementById("buyPacks").value,size=+document.getElementById("buyPackSize").value,packCost=+document.getElementById("buyPackCost").value,salePrice=+document.getElementById("buyUnitPrice").value,unit=document.getElementById("buyUnit").value,supplier=document.getElementById("supplier").value.trim(),alertThreshold=+document.getElementById("buyAlertThreshold").value||0;if(!invoiceNo)return alert("أدخل رقم فاتورة الشراء");if(isNew&&!name)return alert("اكتب اسم المنتج الجديد");if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(size)||size<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");if(!isNew&&p.unit!==unit)return alert("وحدة المنتج المختار لا تطابق وحدة المخزون");let qty=+(packs*size).toFixed(3),unitCost=packCost/size;if(isNew){p={name,price:salePrice,cost:unitCost,stock:0,unit,alertThreshold};cats[ci].products.push(p)}else{p.price=salePrice;p.cost=unitCost;p.alertThreshold=alertThreshold}p.stock=+(p.stock+qty).toFixed(3);purchases.unshift({invoiceNo,date:new Date().toLocaleString("ar-IQ"),category:cats[ci].name,name:p.name,qty,cost:unitCost,packQty:packs,packSize:size,totalCost:packs*packCost,salePrice,expectedProfit:(salePrice-unitCost)*qty,supplier});save();purchasePage();clearPurchaseForm();alert("تم تسجيل المشتريات وإضافة "+qty+" إلى مخزون "+p.name+". تم تفريغ الخانات لإدخال مشتريات جديدة.")}
+function recordPurchase(){
+  let invoiceNo=ensurePurchaseDraft(),ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",name=isNew?document.getElementById("buyNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],packs=+document.getElementById("buyPacks").value,size=+document.getElementById("buyPackSize").value,packCost=+document.getElementById("buyPackCost").value,salePrice=+document.getElementById("buyUnitPrice").value,unit=document.getElementById("buyUnit").value,supplier=document.getElementById("supplier").value.trim(),alertThreshold=+document.getElementById("buyAlertThreshold").value||0;
+  if(isNew&&!name)return alert("اكتب اسم المنتج الجديد");if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(size)||size<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");if(!isNew&&p.unit!==unit)return alert("وحدة المنتج المختار لا تطابق وحدة المخزون");
+  let qty=+(packs*size).toFixed(3),unitCost=packCost/size;
+  if(isNew){p={name,price:salePrice,cost:unitCost,stock:0,unit,alertThreshold};cats[ci].products.push(p)}else{p.price=salePrice;p.cost=unitCost;p.alertThreshold=alertThreshold}
+  p.stock=+(p.stock+qty).toFixed(3);
+  purchases.unshift({invoiceNo,date:new Date().toLocaleString("ar-IQ"),category:cats[ci].name,name:p.name,qty,cost:unitCost,packQty:packs,packSize:size,totalCost:+(packs*packCost).toFixed(2),salePrice,expectedProfit:+((salePrice-unitCost)*qty).toFixed(2),supplier,ci,pi:cats[ci].products.indexOf(p),unit});
+  save();purchasePage();clearPurchaseForm();alert("تمت إضافة "+p.name+" إلى فاتورة المشتريات رقم "+invoiceNo+". يمكنك الآن إضافة المنتج الثاني والثالث على نفس الفاتورة.");
+}
+function clearPurchaseForm(){["buyNewName","buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnitCostCalc","supplier","buyAlertThreshold"].forEach(id=>{let e=document.getElementById(id);if(e)e.value=id==="buyPacks"||id==="buyPackSize"?"1":id==="buyUnitCostCalc"?"0 د.ع":""});let b=document.getElementById("buyProd");if(b)b.selectedIndex=0;updatePurchasePreview()}
 function notificationsPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="التنبيهات";document.getElementById("hint").textContent="تنبيهات المخزون والعمليات التي تحتاج انتباهك";let low=[];cats.forEach(c=>c.products.forEach(p=>{let t=Number(p.alertThreshold??0);if(t>0&&Number(p.stock)<=t)low.push({name:p.name,stock:p.stock,threshold:t,cat:c.name,unit:p.unit});}));let debtAlerts=debts.filter(d=>d.amount>d.paid).length;document.getElementById("catalog").innerHTML=`<div class="cards">
 <div class="stat">
 <span>تنبيهات المخزون</span>
@@ -829,221 +837,45 @@ function showDebtorDetails(name){let rows=debts.filter(d=>d.debtor===name),el=do
 <p class="hint">تُغلق الفاتورة تلقائياً عند تسديد كامل مبلغها، وتبقى مفتوحة إذا كان عليها مبلغ متبقٍ.</p>`}
 function closeDebtorDetails(){let el=document.getElementById("debtorDetails");if(el)el.innerHTML=""}
 function addDebt(){let name=prompt("أدخل اسم الشخص:");if(name===null)return;name=name.trim();if(!name)return alert("اسم الشخص مطلوب");let raw=prompt("أدخل مبلغ الدين:");if(raw===null)return;let amount=Number(raw);if(!Number.isFinite(amount)||amount<=0)return alert("أدخل مبلغاً صحيحاً أكبر من صفر");let now=new Date(),id=Date.now(),date=now.toLocaleString("ar-IQ");debts.unshift({id,debtor:name,amount:+amount.toFixed(2),paid:0,date,invoiceId:"DEBT-"+id,items:[]});save();debtsPage();alert("تمت إضافة دين بمبلغ "+fmt(amount)+" على "+name)}
-function payDebt(name){let rows=debts.filter(d=>d.debtor===name&&d.amount>d.paid),remain=rows.reduce((a,d)=>a+d.amount-d.paid,0);if(!remain)return alert("لا يوجد مبلغ متبقٍ");let raw=prompt("المبلغ المتبقي: "+fmt(remain)+"\\nأدخل مبلغ التسديد:");if(raw===null)return;let amount=Number(raw);if(!Number.isFinite(amount)||amount<=0)return alert("أدخل مبلغاً صحيحاً أكبر من صفر");if(amount>remain)return alert("مبلغ التسديد أكبر من الدين المتبقي");let left=amount;rows.forEach(d=>{let due=d.amount-d.paid,take=Math.min(due,left);d.paid=+(d.paid+take).toFixed(2);left=+(left-take).toFixed(2)});let now=new Date(),id=Date.now(),date=now.toLocaleString("ar-IQ");sales.unshift({id,dayKey:(activeSalesDay||todayKey()),date,method:"تسديد دين",debtor:name,items:[],subtotal:amount,discount:0,total:amount,profit:0,debtCollection:true});save();debtsPage();alert("تم تسجيل تسديد "+fmt(amount)+" من دين "+name+" وإضافته إلى سجل المبيعات")}
-function salesPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="سجل المبيعات والأرباح";document.getElementById("hint").textContent="تابع حسابات اليوم واحفظ الإغلاق اليومي، أو راجع الأيام السابقة";let key=activeSalesDay||todayKey(),todaySales=sales.filter(x=>x.dayKey===key),rev=todaySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.total,0),paidDebts=todaySales.filter(x=>x.debtCollection).reduce((a,x)=>a+x.total,0),income=todaySales.filter(x=>x.method!=="دين").reduce((a,x)=>a+x.total,0),profit=todaySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.profit,0),closed=closedDays.some(x=>x.dayKey===key);document.getElementById("catalog").innerHTML=`<h3>حسابات اليوم (${key})</h3>
-<div class="cards">
-<div class="stat">
-<span>عدد فواتير اليوم</span>
-<b>${todaySales.length}</b>
-</div>
-<div class="stat">
-<span>إجمالي مبيعات اليوم</span>
-<b>${fmt(rev)}</b>
-</div>
-<div class="stat">
-<span>الدخل المستلم اليوم</span>
-<b>${fmt(income)}</b>
-</div>
-<div class="stat">
-<span>الديون المسددة اليوم</span>
-<b>${fmt(paidDebts)}</b>
-</div>
-<div class="stat">
-<span>إجمالي أرباح اليوم</span>
-<b style="color:${profit<0?'#bd3d26':'#159447'}">${fmt(profit)}</b>
-</div>
-</div>
-<div class="actions" style="margin:12px 0">
-<button class="green" onclick="closeSalesDay()" ${closed||!todaySales.length?"disabled":""}>🔒 إغلاق اليوم وحفظ الحساب</button>${closed?'<span class="stock-badge stock-ok">تم إغلاق هذا اليوم</span>':""}</div>
-<div class="tablewrap">
-<table>
-<thead>
-<tr>
-<th>رقم الفاتورة</th>
-<th>التاريخ والوقت</th>
-<th>عدد المنتجات</th>
-<th>طريقة الدفع</th>
-<th>المبيعات / التسديد</th>
-<th>الربح</th>
-</tr>
-</thead>
-<tbody>${todaySales.map((x,i)=>`<tr>
-<td>${todaySales.length-i} <button class="gray" style="padding:4px 8px" onclick="toggleInvoiceInline(${x.id})">▶</button>
-</td>
-<td>${x.date}</td>
-<td>${x.items.length}</td>
-<td>${x.method}</td>
-<td>${fmt(x.total)}</td>
-<td>${fmt(x.profit)}</td>
-</tr>
-<tr id="invoiceInline_${x.id}" class="invoice-detail-row" style="display:none">
-<td colspan="6">
-<div id="invoiceInlineBody_${x.id}">
-</div>
-</td>
-</tr>`).join("")||'<tr>\n<td colspan="6">لا توجد مبيعات مسجلة لهذا اليوم بعد</td>\n</tr>'}</tbody>
-<tfoot>
-<tr style="font-weight:bold;background:#e8f5ee">
-<td colspan="4">إجمالي المبيعات</td>
-<td>${fmt(rev)}<td style="color:${profit<0?"#bd3d26":"#159447"}">${fmt(profit)}</td>
-</tr>
-<tr style="font-weight:bold">
-<td colspan="4">الديون المسددة اليوم</td>
-<td>${fmt(paidDebts)}</td>
-<td>—</td>
-</tr>
-<tr style="font-weight:bold;background:#e8f5ee">
-<td colspan="4">الدخل المستلم اليوم</td>
-<td>${fmt(income)}</td>
-<td>—</td>
-</tr>
-</tfoot>
-</table>
-</div>
-<h3 style="margin-top:22px">سجل إغلاقات الأيام السابقة</h3>
-<div class="tablewrap">
-<table>
-<thead>
-<tr>
-<th>التاريخ</th>
-<th>عدد الفواتير</th>
-<th>إجمالي المبيعات</th>
-<th>إجمالي الأرباح</th>
-<th>التفاصيل</th>
-</tr>
-</thead>
-<tbody>${closedDays.slice().sort((a,b)=>b.dayKey.localeCompare(a.dayKey)).map((d,i)=>`<tr>
-<td>${d.dayKey}</td>
-<td>${d.count}</td>
-<td>${fmt(d.revenue)}</td>
-<td>${fmt(d.profit)}</td>
-<td>
-<button class="gray" onclick="showClosedDay('${d.dayKey}')"">عرض</button> <button class="blue" onclick="reopenSalesDay('${d.dayKey}')">إعادة فتح</button>
-</td>
-</tr>`).join("")||'<tr>\n<td colspan="5">لم يتم حفظ إغلاقات يومية بعد</td>\n</tr>'}</tbody>
-</table>
-</div>
-<div id="invoiceDetails">
-</div>
-<div class="actions" style="margin-top:12px">
-<button class="gray" onclick="exportData()">تصدير نسخة احتياطية JSON</button>
-<button class="red" onclick="resetSales()">مسح سجل المبيعات</button>
-</div>`}
-function closeSalesDay(){let key=activeSalesDay||todayKey();if(closedDays.some(x=>x.dayKey===key))return alert("تم إغلاق هذا اليوم مسبقاً");let daySales=sales.filter(x=>x.dayKey===key);if(!daySales.length)return alert("لا توجد مبيعات لهذا اليوم حتى يتم إغلاقه");let revenue=daySales.reduce((a,x)=>a+x.total,0),profit=daySales.reduce((a,x)=>a+x.profit,0);closedDays.push({dayKey:key,count:daySales.length,revenue,profit,invoiceIds:daySales.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")});activeSalesDay=null;save();salesPage();alert("تم حفظ إغلاق يوم "+key+" بنجاح")}
-function reopenSalesDay(key){let d=closedDays.find(x=>x.dayKey===key);if(!d)return alert("سجل الإغلاق غير موجود");if(!confirm("إعادة فتح حساب يوم "+key+"؟ ستتمكن من إضافة فواتير جديدة لهذا اليوم، وسيبقى سجل فواتيره محفوظاً."))return;closedDays=closedDays.filter(x=>x.dayKey!==key);activeSalesDay=key;save();closeModal();salesPage();alert("تمت إعادة فتح حساب يوم "+key)}
-function showClosedDay(key){let d=closedDays.find(x=>x.dayKey===key);if(!d)return;let ids=Array.isArray(d.invoiceIds)?d.invoiceIds:[],rows=sales.filter(x=>ids.includes(x.id)||x.dayKey===key);document.getElementById("modalTitle").textContent="ملخص مبيعات يوم "+key;document.getElementById("modalBody").innerHTML=`<div class="cards">
-<div class="stat">
-<span>عدد الفواتير</span>
-<b>${d.count}</b>
-</div>
-<div class="stat">
-<span>إجمالي المبيعات</span>
-<b>${fmt(d.revenue)}</b>
-</div>
-<div class="stat">
-<span>إجمالي الأرباح</span>
-<b>${fmt(d.profit)}</b>
-</div>
-</div>
-<div class="actions">
-<button class="blue" onclick="reopenSalesDay('${key}')">إعادة فتح هذا اليوم</button>
-</div>
-<h3>تفاصيل الفواتير والمنتجات المباعة</h3>${rows.map((x,i)=>`<div class="tablewrap" style="margin:12px 0;padding:8px">
-<h4 style="padding:8px">الفاتورة رقم ${i+1} — ${x.date||key}</h4>
-<table>
-<thead>
-<tr>
-<th>المنتج</th>
-<th>الكمية</th>
-<th>سعر الوحدة</th>
-<th>الإجمالي</th>
-</tr>
-</thead>
-<tbody>${(Array.isArray(x.items)?x.items:[]).map(it=>`<tr>
-<td>${it.name||"منتج"}</td>
-<td>${it.qty??0}</td>
-<td>${fmt(it.price||0)}</td>
-<td>${fmt((it.price||0)*(it.qty||0))}</td>
-</tr>`).join("")||'<tr><td colspan="4">تفاصيل المنتجات غير محفوظة لهذه الفاتورة القديمة</td></tr>'}</tbody>
-<tfoot>
-<tr>
-<th colspan="3">إجمالي الفاتورة</th>
-<th>${fmt(x.total||0)}</th>
-</tr>
-<tr>
-<th colspan="3">الربح</th>
-<th>${fmt(x.profit||0)}</th>
-</tr>
-</tfoot>
-</table>
-</div>`).join("")||'<p>لا توجد تفاصيل فواتير محفوظة لهذا اليوم.</p>'}`;openModal()}
-function toggleInvoiceInline(id){let row=document.getElementById("invoiceInline_"+id),body=document.getElementById("invoiceInlineBody_"+id);if(!row||!body)return;let open=row.style.display!=="none";if(open){row.style.display="none";return}let s=sales.find(x=>x.id===id);if(!s)return;body.innerHTML=`<b>تفاصيل الفاتورة — ${s.date}</b>
-<table>
-<thead>
-<tr>
-<th>المنتج</th>
-<th>الكمية</th>
-<th>السعر</th>
-<th>المجموع</th>
-</tr>
-</thead>
-<tbody>${(s.items||[]).map(it=>`<tr>
-<td>${it.name}</td>
-<td>${it.qty}</td>
-<td>${fmt(it.price)}</td>
-<td>${fmt(it.price*it.qty)}</td>
-</tr>`).join("")}</tbody>
-<tfoot>
-<tr>
-<th colspan="3">الخصم</th>
-<th>${fmt(s.discount||0)}</th>
-</tr>
-<tr>
-<th colspan="3">الإجمالي</th>
-<th>${fmt(s.total)}</th>
-</tr>
-</tfoot>
-</table>`;row.style.display="table-row"}
-function showInvoice(id){let s=sales.find(x=>x.id===id);if(!s)return;let box=document.getElementById("invoiceDetails");box.innerHTML=`<div class="tablewrap" style="margin-top:14px">
-<h3 style="padding:12px 12px 0">تفاصيل الفاتورة رقم ${sales.indexOf(s)+1}</h3>
-<table>
-<thead>
-<tr>
-<th>المنتج</th>
-<th>الكمية</th>
-<th>سعر الوحدة</th>
-<th>المجموع</th>
-</tr>
-</thead>
-<tbody>${s.items.map(x=>`<tr>
-<td>${x.name}</td>
-<td>${x.qty}</td>
-<td>${fmt(x.price)}</td>
-<td>${fmt(x.price*x.qty)}</td>
-</tr>`).join("")}</tbody>
-<tfoot>
-<tr>
-<th colspan="3">المجموع قبل الخصم</th>
-<th>${fmt(s.subtotal??s.items.reduce((a,x)=>a+x.price*x.qty,0))}</th>
-</tr>
-<tr>
-<th colspan="3">الخصم</th>
-<th>${fmt(s.discount||0)}</th>
-</tr>
-<tr>
-<th colspan="3">الإجمالي النهائي</th>
-<th>${fmt(s.total)}</th>
-</tr>
-</tfoot>
-</table>
-<div style="padding:10px;text-align:left">
-<button class="gray" onclick="document.getElementById('invoiceDetails').innerHTML=''">إغلاق التفاصيل</button>
-</div>
-</div>`;box.scrollIntoView({behavior:"smooth",block:"nearest"})}
+function payDebt(name){let rows=debts.filter(d=>d.debtor===name&&d.amount>d.paid),remain=rows.reduce((a,d)=>a+d.amount-d.paid,0);if(!remain)return alert("لا يوجد مبلغ متبقٍ");let raw=prompt("المبلغ المتبقي: "+fmt(remain)+"\\nأدخل مبلغ التسديد:");if(raw===null)return;let amount=Number(raw);if(!Number.isFinite(amount)||amount<=0)return alert("أدخل مبلغاً صحيحاً أكبر من صفر");if(amount>remain)return alert("مبلغ التسديد أكبر من الدين المتبقي");let left=amount;rows.forEach(d=>{let due=d.amount-d.paid,take=Math.min(due,left);d.paid=+(d.paid+take).toFixed(2);left=+(left-take).toFixed(2)});let now=new Date(),id=Date.now(),date=now.toLocaleString("ar-IQ");sales.unshift({id,dayKey:ensureActiveSalesSession(),date,method:"تسديد دين",debtor:name,items:[],subtotal:amount,discount:0,total:amount,profit:0,debtCollection:true});save();debtsPage();alert("تم تسجيل تسديد "+fmt(amount)+" من دين "+name+" وإضافته إلى سجل المبيعات")}
+function salesPage(){
+  document.getElementById("catalog").className="";document.getElementById("heading").textContent="سجل المبيعات والأرباح";document.getElementById("hint").textContent="إغلاق الحساب يصفّر شاشة الحساب الحالية فقط، وتبقى الفواتير محفوظة في سجل الإغلاقات ويمكن إعادة فتحها";
+  let key=ensureActiveSalesSession(),dateLabel=salesSessionDate(key),todaySales=sales.filter(x=>x.dayKey===key),rev=todaySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.total,0),paidDebts=todaySales.filter(x=>x.debtCollection).reduce((a,x)=>a+x.total,0),income=todaySales.filter(x=>x.method!=="دين").reduce((a,x)=>a+x.total,0),profit=todaySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.profit,0);
+  document.getElementById("catalog").innerHTML=`<h3>حسابات الفاتورة الحالية — ${dateLabel}</h3>
+  <div class="cards"><div class="stat"><span>عدد فواتير الحالية</span><b>${todaySales.length}</b></div><div class="stat"><span>إجمالي المبيعات الحالية</span><b>${fmt(rev)}</b></div><div class="stat"><span>الدخل المستلم الحالي</span><b>${fmt(income)}</b></div><div class="stat"><span>الديون المسددة الحالية</span><b>${fmt(paidDebts)}</b></div><div class="stat"><span>إجمالي أرباح الحالية</span><b style="color:${profit<0?'#bd3d26':'#159447'}">${fmt(profit)}</b></div></div>
+  <div class="actions" style="margin:12px 0"><button class="green" onclick="closeSalesDay()" ${todaySales.length?"":"disabled"}>🔒 إغلاق الفاتورة / اليوم وفتح حساب جديد</button></div>
+  <div class="notice">عند الإغلاق تُحفظ هذه الفواتير في سجل الإغلاقات وتصبح الحسابات أعلاه صفراً. يمكنك لاحقاً الضغط على «إعادة فتح» لإرجاع نفس الحساب.</div>
+  <div class="tablewrap"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ والوقت</th><th>عدد المنتجات</th><th>طريقة الدفع</th><th>المبيعات / التسديد</th><th>الربح</th></tr></thead><tbody>
+  ${todaySales.map((x,i)=>`<tr><td>${todaySales.length-i} <button class="gray" style="padding:4px 8px" onclick="toggleInvoiceInline(${x.id})">▶</button></td><td>${x.date}</td><td>${(x.items||[]).length}</td><td>${x.method}</td><td>${fmt(x.total)}</td><td>${fmt(x.profit)}</td></tr><tr id="invoiceInline_${x.id}" class="invoice-detail-row" style="display:none"><td colspan="6"><div id="invoiceInlineBody_${x.id}"></div></td></tr>`).join("")||'<tr><td colspan="6">لا توجد فواتير في الحساب الحالي.</td></tr>'}</tbody>
+  <tfoot><tr style="font-weight:bold;background:#e8f5ee"><td colspan="4">إجمالي المبيعات</td><td>${fmt(rev)}</td><td style="color:${profit<0?"#bd3d26":"#159447"}">${fmt(profit)}</td></tr><tr style="font-weight:bold"><td colspan="4">الديون المسددة</td><td>${fmt(paidDebts)}</td><td>—</td></tr><tr style="font-weight:bold;background:#e8f5ee"><td colspan="4">الدخل المستلم</td><td>${fmt(income)}</td><td>—</td></tr></tfoot></table></div>
+  <h3 style="margin-top:22px">سجل الإغلاقات السابقة</h3><div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>رقم الجلسة</th><th>عدد الفواتير</th><th>إجمالي المبيعات</th><th>إجمالي الأرباح</th><th>التفاصيل</th></tr></thead><tbody>
+  ${closedDays.slice().sort((a,b)=>String(b.closedAt||b.dayKey).localeCompare(String(a.closedAt||a.dayKey))).map(d=>`<tr><td>${salesSessionDate(d.dayKey)}</td><td>${salesSessionNumber(d.dayKey)}</td><td>${d.count}</td><td>${fmt(d.revenue)}</td><td>${fmt(d.profit)}</td><td><button class="gray" onclick="showClosedDay('${String(d.dayKey).replace(/'/g,"\\'")}')">عرض</button> <button class="blue" onclick="reopenSalesDay('${String(d.dayKey).replace(/'/g,"\\'")}')">إعادة فتح</button></td></tr>`).join("")||'<tr><td colspan="6">لم يتم حفظ إغلاقات بعد.</td></tr>'}</tbody></table></div>
+  <div id="invoiceDetails"></div><div class="actions" style="margin-top:12px"><button class="gray" onclick="exportData()">تصدير نسخة احتياطية JSON</button><button class="red" onclick="resetSales()">مسح سجل المبيعات</button></div>`;
+}
+function closeSalesDay(){
+  let key=ensureActiveSalesSession(),daySales=sales.filter(x=>x.dayKey===key);if(!daySales.length)return alert("لا توجد فواتير في الحساب الحالي حتى يتم إغلاقه");
+  if(closedDays.some(x=>x.dayKey===key))return alert("تم إغلاق هذا الحساب مسبقاً");
+  let revenue=daySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.total,0),profit=daySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.profit,0);
+  if(!confirm("سيتم إغلاق الحساب الحالي وحفظ "+daySales.length+" فاتورة. بعدها ستظهر حسابات جديدة بصفر. هل تريد المتابعة؟"))return;
+  closedDays.push({dayKey:key,dateKey:salesSessionDate(key),sessionNo:salesSessionNumber(key),count:daySales.length,revenue,profit,invoiceIds:daySales.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")});
+  activeSalesDay=nextSalesSessionKey(salesSessionDate(key));save();salesPage();alert("تم إغلاق الحساب بنجاح. تم فتح حساب جديد برصيد صفر.");
+}
+function reopenSalesDay(key){
+  let d=closedDays.find(x=>x.dayKey===key);if(!d)return alert("سجل الإغلاق غير موجود");
+  let activeRows=activeSalesDay?sales.filter(x=>x.dayKey===activeSalesDay):[];
+  if(activeRows.length&&activeSalesDay!==key)return alert("الحساب الحالي يحتوي على فواتير. أغلق الحساب الحالي أولاً ثم أعد فتح الحساب السابق.");
+  if(!confirm("إعادة فتح الحساب المغلق بتاريخ "+salesSessionDate(key)+"؟ ستعود فواتيره وحساباته كما كانت قبل الإغلاق."))return;
+  closedDays=closedDays.filter(x=>x.dayKey!==key);activeSalesDay=key;save();closeModal();salesPage();alert("تمت إعادة فتح الحساب. يمكنك الآن متابعة الفواتير عليه.");
+}
+function showClosedDay(key){
+  let d=closedDays.find(x=>x.dayKey===key);if(!d)return;let ids=Array.isArray(d.invoiceIds)?d.invoiceIds:[],rows=ids.length?sales.filter(x=>ids.includes(x.id)):sales.filter(x=>x.dayKey===key);
+  document.getElementById("modalTitle").textContent="ملخص الحساب المغلق — "+salesSessionDate(key);
+  document.getElementById("modalBody").innerHTML=`<div class="cards"><div class="stat"><span>رقم الجلسة</span><b>${salesSessionNumber(key)}</b></div><div class="stat"><span>عدد الفواتير</span><b>${d.count}</b></div><div class="stat"><span>إجمالي المبيعات</span><b>${fmt(d.revenue)}</b></div><div class="stat"><span>إجمالي الأرباح</span><b>${fmt(d.profit)}</b></div></div><div class="actions"><button class="blue" onclick="reopenSalesDay('${String(key).replace(/'/g,"\\'")}")">🔓 إعادة فتح هذا الحساب</button></div><h3>تفاصيل الفواتير والمنتجات المباعة</h3>${rows.map((x,i)=>`<div class="tablewrap" style="margin:12px 0;padding:8px"><h4 style="padding:8px">الفاتورة رقم ${i+1} — ${x.date||salesSessionDate(key)}</h4><table><thead><tr><th>المنتج</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>${(Array.isArray(x.items)?x.items:[]).map(it=>`<tr><td>${it.name||"منتج"}</td><td>${it.qty??0}</td><td>${fmt(it.price||0)}</td><td>${fmt((it.price||0)*(it.qty||0))}</td></tr>`).join("")||'<tr><td colspan="4">تفاصيل المنتجات غير محفوظة لهذه الفاتورة القديمة</td></tr>'}</tbody><tfoot><tr><th colspan="3">إجمالي الفاتورة</th><th>${fmt(x.total||0)}</th></tr><tr><th colspan="3">الربح</th><th>${fmt(x.profit||0)}</th></tr></tfoot></table></div>`).join("")||'<p>لا توجد تفاصيل فواتير محفوظة لهذا الحساب.</p>'}`;openModal();
+}
 function resetSales(){if(!confirm("متأكد من مسح سجل المبيعات؟ لا يمكن التراجع."))return;sales=[];save();salesPage()}
 function exportData(){let data={categories:cats,sales,purchases,debts},blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="cashier-backup.json";a.click();URL.revokeObjectURL(a.href)}
 function searchProducts(){let q=document.getElementById("search").value.trim().toLowerCase();if(!q){showCats();return}document.getElementById("heading").textContent="نتائج البحث";document.getElementById("hint").textContent="اختر المنتج لإضافته للفاتورة";document.getElementById("back").style.display="inline-block";let a=[];cats.forEach((c,ci)=>c.products.forEach((p,pi)=>{if(p.name.toLowerCase().includes(q))a.push({...p,icon:c.icon,category:ci,index:pi})}));draw(a)}
-showCats();renderCart();
+showCats();renderCart();initHistory();
 
 let authMode="login",authRole="auto";
 function renderAuth(){
