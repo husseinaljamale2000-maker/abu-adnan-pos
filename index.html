@@ -1169,30 +1169,51 @@ function closeSalesDay(){
   activeSalesDay=nextSalesSessionKey(salesSessionDate(key));save();salesPage();alert("تم إغلاق الحساب بنجاح. تم فتح حساب جديد برصيد صفر.");
 }
 function reopenSalesDay(key){
-  const d=closedDays.find(x=>String(x.dayKey)===String(key));
-  if(!d)return alert("سجل الإغلاق غير موجود");
-  const targetKey=String(key);
+  const targetKey=String(key||"");
+  if(!targetKey)return alert("رقم الحساب غير صحيح");
+
+  // ابحث عن الحساب المغلق، أو أعد بناء سجل الإغلاق إذا كانت الفواتير موجودة لكن سجل الإغلاق اختفى.
+  let d=closedDays.find(x=>String(x.dayKey)===targetKey);
+  let targetRows=sales.filter(x=>String(x.dayKey)===targetKey);
+  if(!d && !targetRows.length){
+    return alert("لم يتم العثور على هذا الحساب المغلق.");
+  }
+  if(!d){
+    const revenue=targetRows.filter(x=>!x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0);
+    const profit=targetRows.filter(x=>!x.debtCollection).reduce((a,x)=>a+Number(x.profit||0),0);
+    d={dayKey:targetKey,dateKey:salesSessionDate(targetKey),sessionNo:salesSessionNumber(targetKey),count:targetRows.length,revenue,profit,invoiceIds:targetRows.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")};
+    closedDays.push(d);
+  }
+
   const currentKey=activeSalesDay?String(activeSalesDay):"";
   const activeRows=currentKey?sales.filter(x=>String(x.dayKey)===currentKey):[];
   if(currentKey===targetKey){
     closedDays=closedDays.filter(x=>String(x.dayKey)!==targetKey);
-    save();closeModal();salesPage();
+    save();
+    closeModal();
+    salesPage();
     alert("الحساب مفتوح بالفعل.");
     return;
   }
+
+  // لا نسمح بالكتابة فوق حساب حالي يحتوي عمليات. احفظه أولاً كحساب مستقل.
   if(activeRows.length){
-    if(!confirm("الحساب الحالي يحتوي على "+activeRows.length+" عملية. سيتم حفظه كحساب مغلق ثم إعادة فتح الحساب السابق. هل تريد المتابعة؟"))return;
+    if(!confirm("الحساب الحالي يحتوي على "+activeRows.length+" عملية. سيتم إبقاؤه محفوظاً كحساب مستقل ثم إعادة فتح الحساب السابق. هل تريد المتابعة؟"))return;
     if(!closedDays.some(x=>String(x.dayKey)===currentKey)){
       const currentRevenue=activeRows.filter(x=>!x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0);
       const currentProfit=activeRows.filter(x=>!x.debtCollection).reduce((a,x)=>a+Number(x.profit||0),0);
       closedDays.push({dayKey:currentKey,dateKey:salesSessionDate(currentKey),sessionNo:salesSessionNumber(currentKey),count:activeRows.length,revenue:currentRevenue,profit:currentProfit,invoiceIds:activeRows.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")});
     }
   }
-  if(!confirm("إعادة فتح الحساب رقم "+salesSessionNumber(targetKey)+" بتاريخ "+salesSessionDate(targetKey)+"؟"))return;
+
+  if(!confirm("إعادة فتح الحساب رقم "+salesSessionNumber(targetKey)+" بتاريخ "+salesSessionDate(targetKey)+"؟\n\nسيصبح هذا الحساب هو الحساب الحالي، ويمكنك إضافة فواتير جديدة عليه."))return;
+
   closedDays=closedDays.filter(x=>String(x.dayKey)!==targetKey);
   activeSalesDay=targetKey;
-  save();closeModal();salesPage();
-  alert("تمت إعادة فتح الحساب بنجاح. يمكنك الآن متابعة الفواتير عليه.");
+  save();
+  closeModal();
+  salesPage();
+  alert("تمت إعادة فتح الحساب بنجاح. الحساب الآن مفتوح ويمكنك إضافة فواتير جديدة عليه.");
 }
 function showClosedDay(key){
   let d=closedDays.find(x=>x.dayKey===key);if(!d)return;let ids=Array.isArray(d.invoiceIds)?d.invoiceIds:[],rows=ids.length?sales.filter(x=>ids.includes(x.id)):sales.filter(x=>x.dayKey===key);
@@ -1278,7 +1299,7 @@ function payDebt(name){
   if(!Number.isFinite(amount)||amount<=0)return alert("أدخل مبلغاً صحيحاً أكبر من صفر"); if(amount>remain)return alert("مبلغ التسديد أكبر من الدين المتبقي");
   let left=amount; rows.forEach(d=>{let due=Number(d.amount||0)-Number(d.paid||0),take=Math.min(due,left);d.paid=+(Number(d.paid||0)+take).toFixed(2);left=+(left-take).toFixed(2)});
   sales.unshift({id:Date.now(),dayKey:ensureActiveSalesSession(),date:new Date().toLocaleString("ar-IQ"),method:"تسديد دين",debtor:name,items:[],subtotal:amount,discount:0,total:amount,profit:0,debtCollection:true});
-  save();debtsPage();salesPage();alert("تم تسجيل تسديد "+fmt(amount)+" من دين "+name);
+  save();debtsPage();alert("تم تسجيل تسديد "+fmt(amount)+" من دين "+name);
 }
 function notificationsPage(){
   document.getElementById("catalog").className="";document.getElementById("heading").textContent="التنبيهات";document.getElementById("hint").textContent="تنبيهات المخزون والديون والعمليات التي تحتاج انتباهك";
