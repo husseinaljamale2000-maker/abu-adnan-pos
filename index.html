@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<meta name="abu-adnan-build" content="final-offline-sync-v1">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>كاشير السوبر ماركت - إدارة متكاملة</title>
@@ -21,6 +22,13 @@
  button{min-height:38px}input,select,textarea{font-size:16px!important}
 }
 <style>.notif{border:1px solid #f2d58a;background:#fffaf0;border-radius:10px;padding:12px;margin:8px 0}.notif strong{color:#a05a00}.invoice-detail-row{background:#f8fbff}.invoice-detail-row td{padding:12px}.owner-badge{background:#fff3cd;border:1px solid #f0d36b;padding:5px 9px;border-radius:7px;font-weight:bold}</style>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#123d68">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="أبو عدنان">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
 </head>
 <body>
 <div id="authVeil" class="authveil">
@@ -136,7 +144,8 @@ function save(){
   localStorage.setItem("posBlank40Debts",JSON.stringify(debts));
   if(activeSalesDay)localStorage.setItem("posBlank40ActiveSalesDay",activeSalesDay);else localStorage.removeItem("posBlank40ActiveSalesDay");
   if(purchaseDraftInvoiceNo)localStorage.setItem("posBlank40PurchaseDraftInvoiceNo",purchaseDraftInvoiceNo);else localStorage.removeItem("posBlank40PurchaseDraftInvoiceNo");
-  if(window.autoSyncReady&&!window.applyingCloud)queueAutoPush()
+  if(window.autoSyncReady&&!window.applyingCloud)queueAutoPush();
+  else if(!window.applyingCloud&&(window.offlineSessionActive||navigator.onLine===false)&&localStorage.getItem("posBlank40CloudUid")&&localStorage.getItem("posBlank40ShopId"))markOfflinePending();
 }
 function applyHistoryState(st){if(!st)return;cats=JSON.parse(JSON.stringify(st.categories||[]));sales=JSON.parse(JSON.stringify(st.sales||[]));purchases=JSON.parse(JSON.stringify(st.purchases||[]));closedDays=JSON.parse(JSON.stringify(st.closedDays||[]));debts=JSON.parse(JSON.stringify(st.debts||[]));activeSalesDay=st.activeSalesDay||null;purchaseDraftInvoiceNo=st.purchaseDraftInvoiceNo||null;historyRestoring=true;save();historyRestoring=false;historyLast=historyKey();page(current);renderCart();updateHistoryButtons()}
 function undoAction(){if(!undoStack.length)return;let currentState=JSON.parse(historyLast);let target=undoStack.pop();redoStack.push(currentState);applyHistoryState(target)}
@@ -160,18 +169,135 @@ async function cloudToken(){let token=localStorage.getItem("posBlank40CloudAcces
 const DATA_RESET_VERSION="abuAdnanFreshStartV1";
 function resetBusinessData(){cats=cats.map(c=>({...c,products:[]}));sales=[];purchases=[];closedDays=[];debts=[];activeSalesDay=null;purchaseDraftInvoiceNo=null;localStorage.setItem("posBlank40Cats",JSON.stringify(cats));localStorage.setItem("posBlank40Sales","[]");localStorage.setItem("posBlank40Purchases","[]");localStorage.setItem("posBlank40ClosedDays","[]");localStorage.setItem("posBlank40Debts","[]");localStorage.removeItem("posBlank40ActiveSalesDay");localStorage.removeItem("posBlank40PurchaseDraftInvoiceNo");if(typeof resetHistory==="function")resetHistory()}
 function localSnapshot(){return {version:1,__freshStartVersion:DATA_RESET_VERSION,categories:cats,sales,purchases,closedDays,debts,activeSalesDay,purchaseDraftInvoiceNo,sectionPassword:localStorage.getItem("posBlank40SectionPass")||"",exportedAt:new Date().toISOString()}}
-async function cloudPush(){if(!confirm("سيتم رفع بيانات هذا الجهاز إلى الحساب السحابي. إذا كانت هناك بيانات سحابية سابقة فسيتم استبدالها. هل أنشأت نسخة احتياطية وتريد المتابعة؟"))return;cloudMessage("جارٍ رفع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId"),uid=localStorage.getItem("posBlank40CloudUid");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=id&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId),r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة الجدول");let body={shop_id:shopId,entity_type:"app_state",entity_id:shopId,payload:localSnapshot(),updated_at:new Date().toISOString(),updated_by:uid};if(rows.length){r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync?id=eq."+encodeURIComponent(rows[0].id),{method:"PATCH",headers:{...cloudHeaders(token),"Prefer":"return=minimal"},body:JSON.stringify(body)})}else{r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync",{method:"POST",headers:{...cloudHeaders(token),"Prefer":"return=minimal"},body:JSON.stringify(body)})}if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر حفظ البيانات. تحقق من سياسات RLS")};cloudMessage("تم رفع البيانات إلى السحابة بنجاح.");alert("تم رفع بيانات الكاشير بنجاح")}catch(e){cloudMessage("فشل رفع البيانات: "+e.message,true);alert("فشل رفع البيانات: "+e.message)}}
-async function cloudPull(){if(!confirm("سيتم استبدال بيانات هذا الجهاز بالبيانات الموجودة في السحابة. يُفضّل تصدير نسخة احتياطية أولاً. هل تريد المتابعة؟"))return;cloudMessage("جارٍ استرجاع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=payload&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId)+"&limit=1",r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة البيانات");if(!rows.length)throw Error("لا توجد نسخة سحابية لهذا المتجر.");let d=rows[0].payload;if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();page("sale");showCats();renderCart();cloudMessage("تم استرجاع البيانات السحابية بنجاح.");alert("تم استرجاع بيانات المتجر بنجاح")}catch(e){cloudMessage("فشل الاسترجاع: "+e.message,true);alert("فشل استرجاع البيانات: "+e.message)}}
-let autoPushTimer=null,autoPullTimer=null;window.autoSyncReady=false;window.applyingCloud=false;window.autoSyncBusy=false;window.lastCloudStamp=localStorage.getItem("posBlank40CloudStamp")||"";
+async function cloudPush(){if(!confirm("سيتم رفع بيانات هذا الجهاز إلى الحساب السحابي. إذا كانت هناك بيانات سحابية سابقة فسيتم استبدالها. أنشئ نسخة احتياطية وتأكد أن هذه هي البيانات التي تريد اعتمادها. هل تريد المتابعة؟"))return;cloudMessage("جارٍ رفع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId"),uid=localStorage.getItem("posBlank40CloudUid");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=id&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId),r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة الجدول");let stamp=new Date().toISOString(),body={shop_id:shopId,entity_type:"app_state",entity_id:shopId,payload:localSnapshot(),updated_at:stamp,updated_by:uid};if(rows.length){r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync?id=eq."+encodeURIComponent(rows[0].id),{method:"PATCH",headers:{...cloudHeaders(token),"Prefer":"return=minimal"},body:JSON.stringify(body)})}else{r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync",{method:"POST",headers:{...cloudHeaders(token),"Prefer":"return=minimal"},body:JSON.stringify(body)})}if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر حفظ البيانات. تحقق من سياسات RLS")};window.lastCloudStamp=stamp;localStorage.setItem("posBlank40CloudStamp",stamp);clearOfflinePending();window.offlineSessionActive=false;cloudMessage("تم رفع البيانات إلى السحابة بنجاح.");alert("تم رفع بيانات الكاشير بنجاح")}catch(e){cloudMessage("فشل رفع البيانات: "+e.message,true);alert("فشل رفع البيانات: "+e.message)}}
+async function cloudPull(){if(!confirm("سيتم استبدال بيانات هذا الجهاز بالبيانات الموجودة في السحابة. يُفضّل تصدير نسخة احتياطية أولاً. هل تريد المتابعة؟"))return;cloudMessage("جارٍ استرجاع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=payload,updated_at&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId)+"&limit=1",r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة البيانات");if(!rows.length)throw Error("لا توجد نسخة سحابية لهذا المتجر.");let d=rows[0].payload;if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();window.lastCloudStamp=rows[0].updated_at||"";if(window.lastCloudStamp)localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp);clearOfflinePending();window.offlineSessionActive=false;page("sale");showCats();renderCart();cloudMessage("تم استرجاع البيانات السحابية بنجاح.");alert("تم استرجاع بيانات المتجر بنجاح")}catch(e){cloudMessage("فشل الاسترجاع: "+e.message,true);alert("فشل استرجاع البيانات: "+e.message)}}
+let autoPushTimer=null,autoPullTimer=null;
+window.autoSyncReady=false;window.applyingCloud=false;window.autoSyncBusy=false;
+window.offlineSessionActive=false;
+window.lastCloudStamp=localStorage.getItem("posBlank40CloudStamp")||"";
+
+function hasOfflinePending(){return localStorage.getItem("posBlank40OfflinePending")==="yes"&&!!localStorage.getItem("posBlank40OfflineSnapshot")}
+function markOfflinePending(){
+  if(window.applyingCloud)return;
+  try{
+    localStorage.setItem("posBlank40OfflinePending","yes");
+    localStorage.setItem("posBlank40OfflineSnapshot",JSON.stringify(localSnapshot()));
+    localStorage.setItem("posBlank40OfflineBaseStamp",localStorage.getItem("posBlank40CloudStamp")||"");
+    localStorage.setItem("posBlank40OfflinePendingAt",new Date().toISOString());
+  }catch(e){}
+}
+function clearOfflinePending(){
+  localStorage.removeItem("posBlank40OfflinePending");
+  localStorage.removeItem("posBlank40OfflineSnapshot");
+  localStorage.removeItem("posBlank40OfflineBaseStamp");
+  localStorage.removeItem("posBlank40OfflinePendingAt");
+}
 async function readCloudState(token,shopId){let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=id,payload,updated_at&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId)+"&limit=1",r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة السحابة");return rows[0]||null}
-async function writeCloudState(token,shopId,uid){let row=await readCloudState(token,shopId),body={shop_id:shopId,entity_type:"app_state",entity_id:shopId,payload:localSnapshot(),updated_at:new Date().toISOString(),updated_by:uid};let url,method;if(row){if(window.lastCloudStamp&&row.updated_at!==window.lastCloudStamp)throw Error("CONFLICT");url=SUPABASE_URL+"/rest/v1/cashier_sync?id=eq."+encodeURIComponent(row.id);method="PATCH"}else{url=SUPABASE_URL+"/rest/v1/cashier_sync";method="POST"}let r=await fetch(url,{method,headers:{...cloudHeaders(token),"Prefer":"return=representation","Content-Type":"application/json"},body:JSON.stringify(body)});if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر حفظ السحابة")}let result=await r.json();window.lastCloudStamp=result?.[0]?.updated_at||body.updated_at;localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp)}
+async function writeCloudPayload(token,shopId,uid,payload,expectedStamp){
+  let row=await readCloudState(token,shopId),body={shop_id:shopId,entity_type:"app_state",entity_id:shopId,payload,updated_at:new Date().toISOString(),updated_by:uid};
+  let url,method;
+  if(row){
+    if(expectedStamp&&row.updated_at!==expectedStamp)throw Error("CONFLICT");
+    url=SUPABASE_URL+"/rest/v1/cashier_sync?id=eq."+encodeURIComponent(row.id);method="PATCH";
+  }else{
+    if(expectedStamp)throw Error("CONFLICT");
+    url=SUPABASE_URL+"/rest/v1/cashier_sync";method="POST";
+  }
+  let r=await fetch(url,{method,headers:{...cloudHeaders(token),"Prefer":"return=representation","Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر حفظ السحابة")}
+  let result=await r.json();
+  window.lastCloudStamp=result?.[0]?.updated_at||body.updated_at;
+  localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp);
+}
+async function writeCloudState(token,shopId,uid){return writeCloudPayload(token,shopId,uid,localSnapshot(),window.lastCloudStamp||"")}
+async function syncOfflinePendingChanges(token,shopId,uid){
+  if(!hasOfflinePending())return false;
+  let raw=localStorage.getItem("posBlank40OfflineSnapshot"),payload;
+  try{payload=JSON.parse(raw)}catch(e){throw Error("تعذر قراءة التعديلات المحفوظة بدون إنترنت")}
+  let baseStamp=localStorage.getItem("posBlank40OfflineBaseStamp")||"";
+  let row=await readCloudState(token,shopId);
+  if(row&&baseStamp&&row.updated_at!==baseStamp)throw Error("OFFLINE_CONFLICT");
+  if(row&&!baseStamp)throw Error("OFFLINE_CONFLICT");
+  await writeCloudPayload(token,shopId,uid,payload,baseStamp);
+  clearOfflinePending();
+  window.offlineSessionActive=false;
+  return true;
+}
 function applyCloudState(d){if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();page(current);renderCart()}
-function queueAutoPush(){if(!window.autoSyncReady||window.autoSyncBusy)return;clearTimeout(autoPushTimer);autoPushTimer=setTimeout(async()=>{autoPushTimer=null;if(!window.autoSyncReady)return;window.autoSyncBusy=true;try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId"),uid=localStorage.getItem("posBlank40CloudUid");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}await writeCloudState(token,shopId,uid);cloudMessage("☁️ تمت المزامنة التلقائية",false)}catch(e){cloudMessage(e.message==="CONFLICT"?"يوجد تعديل من جهاز آخر؛ أوقفنا الرفع لحماية البيانات. حدّث البيانات من السحابة بعد حفظ نسخة احتياطية.":"تعذرت المزامنة: "+e.message,true)}finally{window.autoSyncBusy=false}},1200)}
-async function initializeAutoSync(){if(!localStorage.getItem("posBlank40CloudAccess"))throw Error("سجّل الدخول أولاً");cloudMessage("جارٍ ربط الحساب والمزامنة تلقائياً...");let token=await cloudToken(),ctx=await getShopContext(token),shopId=ctx.shop_id,uid=localStorage.getItem("posBlank40CloudUid");let row=await readCloudState(token,shopId);if(row&&row.payload&&row.payload.__freshStartVersion===DATA_RESET_VERSION){applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at)}else{let keepPass=(row&&typeof row.payload?.sectionPassword==="string"&&row.payload.sectionPassword)?row.payload.sectionPassword:(localStorage.getItem("posBlank40SectionPass")||"");resetBusinessData();if(keepPass)localStorage.setItem("posBlank40SectionPass",keepPass);window.lastCloudStamp=row?.updated_at||"";await writeCloudState(token,shopId,uid);localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp);cloudMessage("تم بدء المتجر ببيانات فارغة جديدة.",false)}window.autoSyncReady=true;localStorage.setItem("posBlank40AutoSync","yes");if(autoPullTimer)clearInterval(autoPullTimer);autoPullTimer=setInterval(autoPullCheck,10000);cloudMessage("☁️ تم ربط الحساب والمزامنة التلقائية",false)}
-async function autoPullCheck(){if(!window.autoSyncReady||window.autoSyncBusy)return;window.autoSyncBusy=true;try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let row=await readCloudState(token,shopId);if(row&&row.updated_at!==window.lastCloudStamp){if(autoPushTimer){clearTimeout(autoPushTimer);autoPushTimer=null;cloudMessage("تغيير سحابي جديد؛ أوقفنا المزامنة التلقائية مؤقتاً لتجنب استبدال تعديلات هذا الجهاز.",true);window.autoSyncReady=false;return}applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at);cloudMessage("☁️ استُقبل تحديث من جهاز آخر",false)}}catch(e){cloudMessage("تعذر فحص التحديثات: "+e.message,true)}finally{window.autoSyncBusy=false}}
-async function enableAutoSync(){if(!localStorage.getItem("posBlank40CloudAccess"))return alert("سجّل الدخول السحابي أولاً");if(!confirm("سنفحص بيانات المتجر أولاً. إذا كانت هناك بيانات سحابية سنسترجعها على هذا الجهاز، وإذا لم توجد سنرفع بيانات هذا الجهاز كبداية. هل تريد المتابعة؟"))return;cloudMessage("جارٍ تهيئة المزامنة...");try{let token=await cloudToken(),ctx=await getShopContext(token),shopId=ctx.shop_id,uid=localStorage.getItem("posBlank40CloudUid"),row=await readCloudState(token,shopId);if(row){if(!confirm("وجدنا بيانات محفوظة بالسحابة. سيتم اعتمادها على هذا الجهاز واستبدال بياناته المحلية. هل لديك نسخة احتياطية وتوافق؟"))return;applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at)}else{if(!confirm("لا توجد بيانات سحابية لهذا المتجر. هل تريد رفع البيانات الحالية من هذا الجهاز لتكون البداية؟"))return;window.lastCloudStamp="";await writeCloudState(token,shopId,uid)}window.autoSyncReady=true;localStorage.setItem("posBlank40AutoSync","yes");if(autoPullTimer)clearInterval(autoPullTimer);autoPullTimer=setInterval(autoPullCheck,10000);cloudMessage("☁️ المزامنة التلقائية مفعّلة. تتم متابعة التحديثات كل 10 ثوانٍ.",false);alert("تم تفعيل المزامنة التلقائية")}catch(e){window.autoSyncReady=false;cloudMessage("فشل تفعيل المزامنة: "+e.message,true);alert("فشل تفعيل المزامنة: "+e.message)}}
+function queueAutoPush(){if(!window.autoSyncReady||window.autoSyncBusy)return;clearTimeout(autoPushTimer);autoPushTimer=setTimeout(async()=>{autoPushTimer=null;if(!window.autoSyncReady)return;window.autoSyncBusy=true;try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId"),uid=localStorage.getItem("posBlank40CloudUid");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}await writeCloudState(token,shopId,uid);clearOfflinePending();cloudMessage("☁️ تمت المزامنة التلقائية",false)}catch(e){if(e.message==="CONFLICT"){markOfflinePending();cloudMessage("يوجد تعديل من جهاز آخر؛ أوقفنا الرفع لحماية البيانات. لم نفقد تعديلات هذا الجهاز.",true)}else{markOfflinePending();cloudMessage("تعذرت المزامنة، وتم حفظ التعديل محلياً حتى عودة الاتصال: "+e.message,true)}}finally{window.autoSyncBusy=false}},1200)}
+async function initializeAutoSync(){
+  if(!localStorage.getItem("posBlank40CloudAccess"))throw Error("سجّل الدخول أولاً");
+  cloudMessage("جارٍ ربط الحساب والمزامنة تلقائياً...");
+  let token=await cloudToken(),ctx=await getShopContext(token),shopId=ctx.shop_id,uid=localStorage.getItem("posBlank40CloudUid");
+  if(hasOfflinePending()){
+    try{
+      let pushed=await syncOfflinePendingChanges(token,shopId,uid);
+      if(pushed)cloudMessage("☁️ تم رفع التعديلات التي تمت بدون إنترنت.",false);
+    }catch(e){
+      if(e.message==="OFFLINE_CONFLICT"){
+        window.autoSyncReady=false;
+        cloudMessage("⚠️ توجد تعديلات على السحابة حدثت أثناء انقطاع الإنترنت. لم نستبدل أي بيانات؛ استخدم «استرجاع البيانات السحابية» أو «رفع بيانات هذا الجهاز» بعد مراجعة البيانات.",true);
+        throw Error("OFFLINE_CONFLICT");
+      }
+      throw e;
+    }
+  }
+  let row=await readCloudState(token,shopId);
+  if(row&&row.payload&&row.payload.__freshStartVersion===DATA_RESET_VERSION){
+    if(!hasOfflinePending()){applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at)}
+  }else if(!row){
+    let keepPass=(localStorage.getItem("posBlank40SectionPass")||"");
+    resetBusinessData();if(keepPass)localStorage.setItem("posBlank40SectionPass",keepPass);
+    window.lastCloudStamp="";await writeCloudState(token,shopId,uid);localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp);
+    cloudMessage("تم بدء المتجر ببيانات فارغة جديدة.",false);
+  }else if(!hasOfflinePending()){
+    applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at);
+  }
+  window.autoSyncReady=true;window.offlineSessionActive=false;localStorage.setItem("posBlank40AutoSync","yes");
+  if(autoPullTimer)clearInterval(autoPullTimer);autoPullTimer=setInterval(autoPullCheck,10000);
+  cloudMessage("☁️ تم ربط الحساب والمزامنة التلقائية",false);
+}
+async function autoPullCheck(){
+  if(!window.autoSyncReady||window.autoSyncBusy)return;
+  window.autoSyncBusy=true;
+  try{
+    let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");
+    if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}
+    if(hasOfflinePending()){await syncOfflinePendingChanges(token,shopId,localStorage.getItem("posBlank40CloudUid"));cloudMessage("☁️ تم رفع التعديلات التي تمت بدون إنترنت.",false)}
+    let row=await readCloudState(token,shopId);
+    if(row&&row.updated_at!==window.lastCloudStamp){
+      if(hasOfflinePending()){cloudMessage("⚠️ يوجد تعديل سحابي وتعديل محلي محفوظ؛ لم نستبدل بياناتك.",true);return}
+      applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at);cloudMessage("☁️ استُقبل تحديث من جهاز آخر",false)
+    }
+  }catch(e){
+    if(e.message==="OFFLINE_CONFLICT"){window.autoSyncReady=false;cloudMessage("⚠️ تعارض: توجد تعديلات من جهاز آخر أثناء انقطاع الإنترنت. لم نفقد تعديلات جهازك.",true)}
+    else cloudMessage("تعذر فحص التحديثات: "+e.message,true)
+  }finally{window.autoSyncBusy=false}
+}
+async function enableAutoSync(){
+  if(!localStorage.getItem("posBlank40CloudAccess"))return alert("سجّل الدخول السحابي أولاً");
+  if(!confirm("سنفحص بيانات المتجر أولاً. إذا كانت هناك بيانات سحابية سنسترجعها على هذا الجهاز، وإذا لم توجد سنرفع بيانات هذا الجهاز كبداية. هل تريد المتابعة؟"))return;
+  cloudMessage("جارٍ تهيئة المزامنة...");
+  try{
+    let token=await cloudToken(),ctx=await getShopContext(token),shopId=ctx.shop_id,uid=localStorage.getItem("posBlank40CloudUid");
+    if(hasOfflinePending()){
+      await syncOfflinePendingChanges(token,shopId,uid);
+    }
+    let row=await readCloudState(token,shopId);
+    if(row){
+      if(!confirm("وجدنا بيانات محفوظة بالسحابة. سيتم اعتمادها على هذا الجهاز واستبدال بياناته المحلية. هل لديك نسخة احتياطية وتوافق؟"))return;
+      applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at);
+    }else{
+      if(!confirm("لا توجد بيانات سحابية لهذا المتجر. هل تريد رفع البيانات الحالية من هذا الجهاز لتكون البداية؟"))return;
+      window.lastCloudStamp="";await writeCloudState(token,shopId,uid);
+    }
+    clearOfflinePending();window.offlineSessionActive=false;window.autoSyncReady=true;localStorage.setItem("posBlank40AutoSync","yes");
+    if(autoPullTimer)clearInterval(autoPullTimer);autoPullTimer=setInterval(autoPullCheck,10000);
+    cloudMessage("☁️ المزامنة التلقائية مفعّلة. تتم متابعة التحديثات كل 10 ثوانٍ.",false);alert("تم تفعيل المزامنة التلقائية")
+  }catch(e){window.autoSyncReady=false;cloudMessage(e.message==="OFFLINE_CONFLICT"?"⚠️ تعارض في البيانات المحفوظة بدون إنترنت؛ لم يتم استبدالها.":"فشل تفعيل المزامنة: "+e.message,true);alert(e.message==="OFFLINE_CONFLICT"?"توجد تعديلات سحابية أثناء انقطاع الإنترنت. راجع البيانات قبل اختيار الرفع أو الاسترجاع.":"فشل تفعيل المزامنة: "+e.message)}
+}
 function disableAutoSync(){window.autoSyncReady=false;localStorage.removeItem("posBlank40AutoSync");if(autoPullTimer)clearInterval(autoPullTimer);clearTimeout(autoPushTimer);cloudMessage("المزامنة التلقائية متوقفة على هذا الجهاز.",false)}
-function cloudLogout(){["posBlank40CloudAccess","posBlank40CloudRefresh","posBlank40CloudRefreshKeep","posBlank40CloudUid"].forEach(k=>localStorage.removeItem(k));cloudMessage("تم تسجيل الخروج السحابي من هذا الجهاز.");alert("تم تسجيل الخروج السحابي")}
+function cloudLogout(){["posBlank40CloudAccess","posBlank40CloudRefresh","posBlank40CloudRefreshKeep","posBlank40CloudUid"].forEach(k=>localStorage.removeItem(k));window.offlineSessionActive=false;clearOfflinePending();cloudMessage("تم تسجيل الخروج السحابي من هذا الجهاز.");alert("تم تسجيل الخروج السحابي")}
 function settingsPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="الإعدادات";document.getElementById("hint").textContent="إدارة الأقسام وربط قاعدة البيانات والمزامنة";document.getElementById("catalog").innerHTML=`<div class="panel" style="max-width:760px;margin:12px auto;padding:20px">
 <h3>📂 إضافة الأقسام</h3>
 <p class="muted">أضف أقسام المتجر التي تريدها، وستظهر مباشرة في الكاشير والمخزون.</p>
@@ -935,26 +1061,54 @@ function startCachedOfflineSession(){
   if(!role||!uid||!shopId||!refresh)return false;
   window.ownerMode=role==="owner";
   window.autoSyncReady=false;
+  window.offlineSessionActive=navigator.onLine===false;
   if(autoPullTimer)clearInterval(autoPullTimer);
   document.getElementById("authVeil").style.display="none";
   applyAccessMode();
-  cloudMessage("📴 تعمل الآن بدون إنترنت — سيتم حفظ التغييرات على هذا الجهاز، وتتم المزامنة عند عودة الإنترنت.",false);
+  if(window.offlineSessionActive){
+    cloudMessage("📴 تعمل الآن بدون إنترنت — سيتم حفظ التغييرات محلياً ورفعها تلقائياً عند عودة الاتصال.",false);
+  }else{
+    setTimeout(async()=>{
+      try{
+        await initializeAutoSync();
+      }catch(e){
+        cloudMessage(e.message==="OFFLINE_CONFLICT"?"⚠️ يوجد تعارض في تعديلات محفوظة بدون إنترنت؛ لم نستبدل بياناتك.":"تعذر تشغيل المزامنة التلقائية: "+e.message,true);
+      }
+    },0);
+  }
   return true;
 }
 
+window.addEventListener("offline",()=>{
+  if(localStorage.getItem("posBlank40CloudUid")&&localStorage.getItem("posBlank40ShopId")){
+    window.offlineSessionActive=true;
+    window.autoSyncReady=false;
+    if(autoPullTimer)clearInterval(autoPullTimer);
+    cloudMessage("📴 انقطع الإنترنت — التغييرات الجديدة ستُحفظ محلياً وتنتظر المزامنة.",false);
+  }
+});
+
 window.addEventListener("online",async()=>{
   if(!localStorage.getItem("posBlank40CloudRefreshKeep")||!localStorage.getItem("posBlank40CloudUid"))return;
-  if(window.autoSyncReady)return;
+  window.offlineSessionActive=true;
+  window.autoSyncReady=false;
   try{
     await initializeAutoSync();
-    cloudMessage("☁️ عاد الإنترنت وتمت إعادة المزامنة تلقائياً.",false);
+    cloudMessage("☁️ عاد الإنترنت وتم رفع التعديلات المحلية ومزامنتها تلقائياً.",false);
   }catch(e){
-    cloudMessage("عاد الإنترنت، لكن تعذرت المزامنة: "+e.message,true);
+    cloudMessage(e.message==="OFFLINE_CONFLICT"?"⚠️ عاد الإنترنت لكن توجد تعديلات سحابية أثناء الانقطاع؛ لم نفقد تعديلات جهازك.":"عاد الإنترنت، لكن تعذرت المزامنة: "+e.message,true);
   }
 });
 
 if(!startCachedOfflineSession())renderAuth();
 
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./service-worker.js", {scope: "./"}).catch(function () {});
+  });
+}
 </script>
 </body>
 </html>
