@@ -927,7 +927,33 @@ function applyAccessMode(){
 }
 function logout(){window.ownerMode=false;sectionUnlockUntil=0;clearTimeout(autoPushTimer);if(autoPullTimer)clearInterval(autoPullTimer);window.autoSyncReady=false;localStorage.removeItem("posBlank40CloudAccess");localStorage.removeItem("posBlank40CloudRefresh");localStorage.removeItem("posBlank40CloudRefreshKeep");localStorage.removeItem("posBlank40CloudUid");localStorage.removeItem("posBlank40LinkedUid");localStorage.removeItem("posBlank40AuthUid");localStorage.removeItem("posBlank40ShopId");localStorage.removeItem("posBlank40Role");renderAuth("login");document.getElementById("authPass").value=""}
 
-renderAuth();
+function startCachedOfflineSession(){
+  const role=localStorage.getItem("posBlank40Role");
+  const uid=localStorage.getItem("posBlank40CloudUid");
+  const shopId=localStorage.getItem("posBlank40ShopId");
+  const refresh=localStorage.getItem("posBlank40CloudRefreshKeep")||localStorage.getItem("posBlank40CloudRefresh");
+  if(!role||!uid||!shopId||!refresh)return false;
+  window.ownerMode=role==="owner";
+  window.autoSyncReady=false;
+  if(autoPullTimer)clearInterval(autoPullTimer);
+  document.getElementById("authVeil").style.display="none";
+  applyAccessMode();
+  cloudMessage("📴 تعمل الآن بدون إنترنت — سيتم حفظ التغييرات على هذا الجهاز، وتتم المزامنة عند عودة الإنترنت.",false);
+  return true;
+}
+
+window.addEventListener("online",async()=>{
+  if(!localStorage.getItem("posBlank40CloudRefreshKeep")||!localStorage.getItem("posBlank40CloudUid"))return;
+  if(window.autoSyncReady)return;
+  try{
+    await initializeAutoSync();
+    cloudMessage("☁️ عاد الإنترنت وتمت إعادة المزامنة تلقائياً.",false);
+  }catch(e){
+    cloudMessage("عاد الإنترنت، لكن تعذرت المزامنة: "+e.message,true);
+  }
+});
+
+if(!startCachedOfflineSession())renderAuth();
 
 </script>
 </body>
