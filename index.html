@@ -26,24 +26,18 @@
 <div id="authVeil" class="authveil">
 <div class="authcard">
 <div style="text-align:center;font-size:42px">🔐</div>
-<h2 id="authTitle">إنشاء حساب المدير</h2>
-<p id="authDesc">أنشئ حسابك الخاص للدخول إلى برنامج الكاشير</p>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:12px 0">
-<button type="button" id="authCloudBtn" class="blue" onclick="setAuthRole('cloud')">☁️ الحساب السحابي</button>
-<button type="button" id="authOwnerBtn" class="gray" onclick="setAuthRole('owner')">👑 حساب المالك</button>
-</div>
+<h2 id="authTitle">تسجيل الدخول</h2>
+<p id="authDesc">أدخل البريد الإلكتروني وكلمة المرور</p>
 <div id="authFields">
 </div>
 <button class="blue" id="authSubmit" onclick="submitAuth()">تسجيل الدخول</button>
-<button class="gray" id="authSwitch" onclick="toggleAuthMode()">إنشاء حساب جديد</button>
-<button type="button" class="gray" onclick="forgotCloudPassword()">🔑 نسيت كلمة المرور؟</button>
-<p class="authnote">تسجيل الدخول موحّد باستخدام حساب Supabase السحابي نفسه على جميع أجهزتك.</p>
+<p class="authnote">سيتم تحديد نوع الحساب والصلاحيات تلقائياً من حسابك: حساب المالك يفتح قسم المالك، وحساب الكاشير يفتح قسم الكاشير.</p>
 </div>
 </div>
 <header>
 <div class="brand" id="appTitle" title="5 نقرات لإظهار الإعدادات">
   <div class="aa-logo" aria-label="AA">AA</div>
-  <div class="brand-text"><h1>نظام الكاشير</h1></div>
+  <div class="brand-text"><h1>نظام الكاشير</h1><small>ABU ADNAN</small></div>
 </div>
 <input id="search" placeholder="ابحث عن منتج..." oninput="searchProducts()">
 <button class="gray" onclick="logout()">خروج</button>
@@ -150,53 +144,16 @@ async function autoPullCheck(){if(!window.autoSyncReady||window.autoSyncBusy)ret
 async function enableAutoSync(){if(!localStorage.getItem("posBlank40CloudAccess"))return alert("سجّل الدخول السحابي أولاً");if(!confirm("سنفحص بيانات المتجر أولاً. إذا كانت هناك بيانات سحابية سنسترجعها على هذا الجهاز، وإذا لم توجد سنرفع بيانات هذا الجهاز كبداية. هل تريد المتابعة؟"))return;cloudMessage("جارٍ تهيئة المزامنة...");try{let token=await cloudToken(),ctx=await getShopContext(token),shopId=ctx.shop_id,uid=localStorage.getItem("posBlank40CloudUid"),row=await readCloudState(token,shopId);if(row){if(!confirm("وجدنا بيانات محفوظة بالسحابة. سيتم اعتمادها على هذا الجهاز واستبدال بياناته المحلية. هل لديك نسخة احتياطية وتوافق؟"))return;applyCloudState(row.payload);window.lastCloudStamp=row.updated_at;localStorage.setItem("posBlank40CloudStamp",row.updated_at)}else{if(!confirm("لا توجد بيانات سحابية لهذا المتجر. هل تريد رفع البيانات الحالية من هذا الجهاز لتكون البداية؟"))return;window.lastCloudStamp="";await writeCloudState(token,shopId,uid)}window.autoSyncReady=true;localStorage.setItem("posBlank40AutoSync","yes");if(autoPullTimer)clearInterval(autoPullTimer);autoPullTimer=setInterval(autoPullCheck,10000);cloudMessage("☁️ المزامنة التلقائية مفعّلة. تتم متابعة التحديثات كل 10 ثوانٍ.",false);alert("تم تفعيل المزامنة التلقائية")}catch(e){window.autoSyncReady=false;cloudMessage("فشل تفعيل المزامنة: "+e.message,true);alert("فشل تفعيل المزامنة: "+e.message)}}
 function disableAutoSync(){window.autoSyncReady=false;localStorage.removeItem("posBlank40AutoSync");if(autoPullTimer)clearInterval(autoPullTimer);clearTimeout(autoPushTimer);cloudMessage("المزامنة التلقائية متوقفة على هذا الجهاز.",false)}
 function cloudLogout(){["posBlank40CloudAccess","posBlank40CloudRefresh","posBlank40CloudRefreshKeep","posBlank40CloudUid"].forEach(k=>localStorage.removeItem(k));cloudMessage("تم تسجيل الخروج السحابي من هذا الجهاز.");alert("تم تسجيل الخروج السحابي")}
-function settingsPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="الإعدادات";document.getElementById("hint").textContent="إدارة كلمات مرور الحساب والأقسام وحساب المالك";document.getElementById("catalog").innerHTML=`<div class="panel" style="max-width:760px;margin:12px auto;padding:20px">
-<h3>👤 تغيير كلمة مرور الحساب السحابي</h3>
-<p class="muted">تتغير كلمة المرور للحساب نفسه وتستخدمها على جميع الأجهزة عند تسجيل الدخول مجدداً.</p>
-<div class="fields">
-<label>كلمة المرور الجديدة<input id="accountNewPass" type="password" autocomplete="new-password">
-</label>
-<label>تأكيد كلمة المرور الجديدة<input id="accountConfirmPass" type="password" autocomplete="new-password">
-</label>
-</div>
+function settingsPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="الإعدادات";document.getElementById("hint").textContent="إدارة الأقسام وربط قاعدة البيانات والمزامنة";document.getElementById("catalog").innerHTML=`<div class="panel" style="max-width:760px;margin:12px auto;padding:20px">
+<h3>📂 إضافة الأقسام</h3>
+<p class="muted">أضف أقسام المتجر التي تريدها، وستظهر مباشرة في الكاشير والمخزون.</p>
 <div class="actions">
-<button class="blue" onclick="changeAccountPassword()">تغيير كلمة مرور الحساب</button>
+<button class="blue" onclick="openCategorySettings()">➕ إدارة وإضافة الأقسام</button>
 </div>
-<hr>
-<h3>🔐 كلمة مرور الأقسام</h3>
-<p class="muted">تُستخدم لقفل وفتح المخزون والمشتريات والمبيعات والديون والإعدادات وإدارة المنتجات. بعد إدخالها تبقى الأقسام متاحة لمدة 5 دقائق.</p>
-<div class="fields">
-<label>كلمة المرور الجديدة<input id="sectionPassNew" type="password" autocomplete="new-password" placeholder="4 أحرف أو أرقام على الأقل">
-</label>
-<label>تأكيد كلمة المرور<input id="sectionPassConfirm" type="password" autocomplete="new-password">
-</label>
-</div>
-<div class="actions">
-<button class="blue" onclick="saveSectionPassword()">💾 حفظ كلمة مرور الأقسام</button>
-</div>
-<hr>
-<h3>📂 إضافة أقسام الكاشير</h3>
-<p class="muted">أضف أي قسم جديد وسيظهر مباشرة في شاشة الكاشير والمخزون حتى تضيف له المنتجات.</p>
-<div class="fields">
-<label>اسم القسم<input id="newCategoryName" type="text" placeholder="مثلاً: الألبان"></label>
-<label>أيقونة القسم<input id="newCategoryIcon" type="text" maxlength="4" placeholder="🥛"></label>
-</div>
-<div class="actions"><button class="blue" onclick="addCategory()">➕ إضافة القسم</button></div>
-<div id="categoryManager"></div>
 <hr>
 <h3>☁️ ربط قاعدة البيانات والمزامنة</h3>
-<p class="muted">سجّل الدخول بحساب Supabase الموجود لديك. يمكنك رفع بيانات هذا الجهاز أو استرجاع البيانات السحابية على جهاز آخر. لا ترفع بيانات تجريبية قبل التأكد من النسخة الاحتياطية.</p>
-<div class="fields">
-<label>البريد الإلكتروني<input id="cloudEmail" type="email" autocomplete="username" placeholder="البريد المسجل في Supabase">
-</label>
-<label>كلمة مرور Supabase<input id="cloudPassword" type="password" autocomplete="current-password" placeholder="كلمة مرور الحساب السحابي">
-</label>
-</div>
-<div class="actions">
-<button class="blue" onclick="cloudLogin()">🔐 تسجيل الدخول السحابي</button>
-<button class="gray" onclick="cloudLogout()">تسجيل الخروج السحابي</button>
-</div>
-<p id="cloudStatus" class="notice">${localStorage.getItem("posBlank40CloudAccess")||localStorage.getItem("posBlank40CloudRefreshKeep")?"☁️ الحساب السحابي محفوظ على هذا الجهاز.":"غير متصل بالحساب السحابي."}</p>
+<p class="muted">حالة الاتصال والمزامنة مع قاعدة بيانات المتجر السحابية.</p>
+<p id="cloudStatus" class="notice">${localStorage.getItem("posBlank40CloudAccess")||localStorage.getItem("posBlank40CloudRefreshKeep")?"☁️ الحساب متصل بالسحابة.":"غير متصل بالحساب السحابي."}</p>
 <div class="actions">
 <button class="green" onclick="cloudPush()">⬆️ رفع بيانات هذا الجهاز</button>
 <button class="orange" onclick="cloudPull()">⬇️ استرجاع البيانات السحابية</button>
@@ -205,81 +162,97 @@ function settingsPage(){document.getElementById("catalog").className="";document
 <button class="green" onclick="enableAutoSync()">⚡ تفعيل المزامنة التلقائية</button>
 <button class="gray" onclick="disableAutoSync()">إيقاف المزامنة</button>
 </div>
-<p class="muted">بعد التفعيل تُرفع التغييرات تلقائياً، وتُفحص تحديثات الأجهزة الأخرى كل 10 ثوانٍ. عند اكتشاف تعارض يتوقف الرفع لحماية البيانات؛ تجنّب تسجيل مبيعات متزامنة من جهازين إلى أن نختبر النظام عملياً.</p>
+<p class="muted">بعد التفعيل تتم المزامنة تلقائياً، وتُفحص تحديثات الأجهزة الأخرى كل 10 ثوانٍ.</p>
 <hr>
-<div id="ownerSettings" style="display:none">
+<div id="ownerSettings" style="display:${window.ownerMode?"block":"none"}">
 <h3>👑 إعدادات المالك</h3>
-<p class="muted">لإظهار إعدادات المالك ورمز الأقسام اضغط Ctrl + Alt + Shift + O على الحاسبة. على الآيفون يمكن النقر على عنوان البرنامج 5 مرات.</p>
-<p class="muted">حساب المالك يفتح جميع الأقسام بدون رمز الأقسام. اضغط Ctrl + Alt + Shift + O لإظهار إعدادات المالك داخل هذه الصفحة.</p>
-<div class="fields">
-<label>البريد الإلكتروني لحساب المالك<input id="ownerUserNew" type="email" autocomplete="username" placeholder="owner@example.com">
-</label>
-<label>كلمة مرور المالك<input id="ownerPassNew" type="password" autocomplete="new-password" placeholder="4 أحرف أو أرقام على الأقل">
-</label>
-<label>تأكيد كلمة مرور المالك<input id="ownerPassConfirm" type="password" autocomplete="new-password">
-</label>
+<p class="muted">تظهر إعدادات المالك تلقائياً عند تسجيل الدخول بحساب المالك فقط. حساب الكاشير لا يمكنه الوصول إليها.</p>
 
-</div>
-<div class="actions">
-<button class="orange" onclick="saveOwnerAccount()">حفظ حساب المالك</button>
-</div>
-<hr>
-<h3>👤 إدارة حساب الكاشير</h3>
-<p class="muted">هذه الخانة تظهر للمالك فقط. إذا نسي الكاشير كلمة مروره، يستطيع المالك تعيين كلمة مرور جديدة له من هنا.</p>
+<h4>🔑 تغيير كلمة مرور حساب المالك</h4>
 <div class="fields">
-<label>البريد الإلكتروني للكاشير<input id="cashierManageEmail" type="email" autocomplete="username" placeholder="cashier@example.com"></label>
-<label>كلمة المرور الجديدة<input id="cashierManageNewPass" type="password" autocomplete="new-password" placeholder="8 أحرف أو أكثر"></label>
-<label>تأكيد كلمة المرور<input id="cashierManageConfirmPass" type="password" autocomplete="new-password"></label>
+<label>كلمة المرور الجديدة<input id="ownerNewPass" type="password" autocomplete="new-password" placeholder="8 أحرف أو أكثر"></label>
+<label>تأكيد كلمة المرور<input id="ownerNewPassConfirm" type="password" autocomplete="new-password"></label>
 </div>
-<div class="actions">
-<button class="orange" onclick="changeCashierPasswordByOwner()">🔑 تغيير كلمة مرور الكاشير</button>
-</div>
-<p class="muted">لا يمكن لحساب الكاشير استخدام هذه العملية؛ التحقق من صلاحية المالك يتم أيضاً داخل Supabase.</p>
+<div class="actions"><button class="blue" onclick="changeOwnerPasswordFromSettings()">تغيير كلمة مرور المالك</button></div>
+
 <hr>
-<h4>🔐 استرجاع رمز الأقسام</h4>
-<p class="muted">إذا نُسي رمز الأقسام، حساب المالك يستطيع تعيين رمز جديد لجميع الأجهزة.</p>
-<div class="actions">
-<button class="orange" onclick="resetSectionPasswordAsOwner()">إعادة تعيين رمز الأقسام</button>
+<h4>👤 تغيير كلمة مرور حساب الكاشير</h4>
+<p class="muted">المالك يستطيع تغيير كلمة مرور الكاشير بدون الحاجة إلى معرفة كلمة المرور القديمة.</p>
+<div class="fields">
+<label>بريد حساب الكاشير<input id="cashierEmailAdmin" type="email" autocomplete="username" placeholder="cashier@example.com"></label>
+<label>كلمة المرور الجديدة<input id="cashierNewPass" type="password" autocomplete="new-password" placeholder="8 أحرف أو أكثر"></label>
+<label>تأكيد كلمة المرور<input id="cashierNewPassConfirm" type="password" autocomplete="new-password"></label>
 </div>
-<p class="muted"></p>
+<div class="actions"><button class="orange" onclick="changeCashierPasswordFromSettings()">🔐 تغيير كلمة مرور الكاشير</button></div>
+
+<hr>
+<h4>🔐 تغيير رمز الأقسام</h4>
+<p class="muted">يمكن للمالك تعيين رمز جديد للأقسام، ويصبح فعالاً على جميع الأجهزة بعد المزامنة.</p>
+<div class="actions"><button class="orange" onclick="resetSectionPasswordAsOwner()">تغيير رمز الأقسام</button></div>
+
+<hr>
+<h4 style="color:#b42318">🗑️ تصفير الحساب</h4>
+<p class="muted">يمسح المنتجات والمبيعات والمشتريات والديون والإغلاقات وبيانات العمل من السحابة والأجهزة. حساب المالك وربط المتجر بالسحابة يبقيان كما هما.</p>
+<div class="actions"><button class="red" onclick="resetEntireBusinessAccount()">⚠️ تصفير الحساب بالكامل</button></div>
 </div>
-</div>`;renderCategoryManager()} 
-async function changeAccountPassword(){
-  let nw=document.getElementById("accountNewPass").value,
-      cf=document.getElementById("accountConfirmPass").value;
-  if(nw.length<8)return alert("اجعل كلمة المرور 8 أحرف على الأقل");
+</div>`}
+
+function openCategorySettings(){
+  document.getElementById("modalTitle").textContent="📂 إدارة الأقسام";
+  document.getElementById("modalBody").innerHTML=`<h3>إضافة قسم جديد</h3>
+  <div class="fields">
+    <label>اسم القسم<input id="settingsNewCat" placeholder="مثلاً: المثلجات"></label>
+    <label>الرمز<input id="settingsNewIcon" value="🛒" placeholder="🛒"></label>
+  </div>
+  <div class="actions"><button class="blue" onclick="addCategoryFromSettings()">➕ إضافة القسم</button></div>
+  <hr><h3>الأقسام الحالية</h3><div id="settingsCategoryList"></div>`;
+  renderCategorySettings();
+  openModal();
+}
+function renderCategorySettings(){
+  let box=document.getElementById("settingsCategoryList");
+  if(!box)return;
+  box.innerHTML=cats.map((c,i)=>`<div class="adminrow"><div><b>${c.icon||"🛒"} ${c.name}</b><small>${c.products.length} منتج</small></div><div class="actions"><button class="gray" onclick="renameCategoryFromSettings(${i})">تعديل</button><button class="red" onclick="deleteCategoryFromSettings(${i})">حذف</button></div></div>`).join("")||'<p class="muted">لا توجد أقسام.</p>';
+}
+function addCategoryFromSettings(){let n=document.getElementById("settingsNewCat")?.value.trim(),ic=document.getElementById("settingsNewIcon")?.value.trim()||"🛒";if(!n)return alert("اكتب اسم القسم");if(cats.some(c=>c.name.trim()===n))return alert("هذا القسم موجود مسبقاً");cats.push({name:n,icon:ic,products:[]});save();renderCategorySettings();showCats();alert("تمت إضافة القسم بنجاح")}
+function renameCategoryFromSettings(i){let n=prompt("اسم القسم الجديد",cats[i]?.name||"");if(n===null)return;n=n.trim();if(!n)return alert("اكتب اسم القسم");if(cats.some((c,ci)=>ci!==i&&c.name.trim()===n))return alert("هذا القسم موجود مسبقاً");cats[i].name=n;save();renderCategorySettings();showCats()}
+function deleteCategoryFromSettings(i){let c=cats[i];if(!c)return;if(c.products.length)return alert("لا يمكن حذف قسم يحتوي على منتجات. احذف المنتجات أولاً.");if(!confirm("حذف القسم "+c.name+"؟"))return;cats.splice(i,1);save();renderCategorySettings();showCats()}
+
+async function changeOwnerPasswordFromSettings(){
+  if(!window.ownerMode)return alert("هذه العملية متاحة لحساب المالك فقط");
+  let nw=document.getElementById("ownerNewPass")?.value||"",cf=document.getElementById("ownerNewPassConfirm")?.value||"";
+  if(nw.length<8)return alert("اجعل كلمة مرور المالك 8 أحرف على الأقل");
   if(nw!==cf)return alert("كلمتا المرور غير متطابقتين");
+  if(!confirm("سيتم تغيير كلمة مرور حساب المالك. بعد ذلك سيُطلب منك تسجيل الدخول بالكلمة الجديدة. هل تريد المتابعة؟"))return;
   try{
     let token=await cloudToken();
-    let userRes=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:cloudHeaders(token)});
-    let user=await userRes.json();
-    if(!userRes.ok||!user.email)throw Error("تعذر قراءة بريد الحساب الحالي");
-    let r=await fetch(SUPABASE_URL+"/auth/v1/user",{
-      method:"PUT",headers:cloudHeaders(token),body:JSON.stringify({password:nw})
-    });
+    let r=await fetch(SUPABASE_URL+"/auth/v1/user",{method:"PUT",headers:cloudHeaders(token),body:JSON.stringify({password:nw})});
     let d=await r.json();
-    if(!r.ok)throw Error(d.msg||d.message||d.error_description||"تعذر تغيير كلمة المرور");
-    let verify=await fetch(SUPABASE_URL+"/auth/v1/token?grant_type=password",{
-      method:"POST",
-      headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},
-      body:JSON.stringify({email:user.email,password:nw})
-    });
-    let vd=await verify.json();
-    if(!verify.ok)throw Error("تم إرسال التغيير لكن تعذر التحقق من كلمة المرور الجديدة");
-    ["accountNewPass","accountConfirmPass"].forEach(id=>document.getElementById(id).value="");
-    window.ownerMode=false;
-    sectionUnlockUntil=0;
-    clearTimeout(autoPushTimer);
-    if(autoPullTimer)clearInterval(autoPullTimer);
-    window.autoSyncReady=false;
-    ["posBlank40CloudAccess","posBlank40CloudRefresh","posBlank40CloudRefreshKeep","posBlank40CloudUid","posBlank40LinkedUid","posBlank40AuthUid","posBlank40ShopId","posBlank40Role"].forEach(k=>localStorage.removeItem(k));
-    renderAuth("login");
-    document.getElementById("authPass").value="";
-    alert("تم تغيير كلمة مرور الحساب بنجاح. تم تسجيل الخروج، استخدم كلمة المرور الجديدة عند الدخول.");
-  }catch(e){
-    alert("تعذر تغيير كلمة المرور: "+e.message);
-  }
+    if(!r.ok)throw Error(d.msg||d.message||d.error_description||"تعذر تغيير كلمة مرور المالك");
+    ["ownerNewPass","ownerNewPassConfirm"].forEach(id=>{let el=document.getElementById(id);if(el)el.value=""});
+    alert("تم تغيير كلمة مرور المالك بنجاح. يمكنك متابعة العمل، واستخدم الكلمة الجديدة عند تسجيل الدخول لاحقاً.");
+  }catch(e){alert("تعذر تغيير كلمة مرور المالك: "+e.message)}
 }
+
+async function changeCashierPasswordFromSettings(){
+  if(!window.ownerMode)return alert("هذه العملية متاحة لحساب المالك فقط");
+  let email=document.getElementById("cashierEmailAdmin")?.value.trim().toLowerCase()||"";
+  let pw=document.getElementById("cashierNewPass")?.value||"",cf=document.getElementById("cashierNewPassConfirm")?.value||"";
+  if(!email||!email.includes("@"))return alert("أدخل بريد حساب الكاشير الصحيح");
+  if(pw.length<8)return alert("اجعل كلمة مرور الكاشير 8 أحرف على الأقل");
+  if(pw!==cf)return alert("كلمتا المرور غير متطابقتين");
+  if(!confirm("سيتم تغيير كلمة مرور حساب الكاشير. هل تريد المتابعة؟"))return;
+  try{
+    let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");
+    if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}
+    let r=await fetch(SUPABASE_URL+"/functions/v1/update-cashier-password",{method:"POST",headers:{...cloudHeaders(token),"Authorization":"Bearer "+token},body:JSON.stringify({email,password:pw,shop_id:shopId})});
+    let d=await r.json();
+    if(!r.ok)throw Error(d.error||d.message||"تعذر تغيير كلمة مرور الكاشير");
+    ["cashierNewPass","cashierNewPassConfirm"].forEach(id=>{let el=document.getElementById(id);if(el)el.value=""});
+    alert("تم تغيير كلمة مرور الكاشير بنجاح.");
+  }catch(e){alert("تعذر تغيير كلمة مرور الكاشير: "+e.message)}
+}
+
 async function resetSectionPasswordAsOwner(){
   if(!window.ownerMode)return alert("هذه العملية متاحة لحساب المالك فقط");
   let pw=prompt("أدخل رمز الأقسام الجديد (4 أحرف أو أرقام على الأقل):");
@@ -309,50 +282,40 @@ async function resetSectionPasswordAsOwner(){
     alert("تم إعادة تعيين رمز الأقسام بنجاح. أصبح الرمز الجديد فعالاً على المتجر.");
   }catch(e){alert("تعذر إعادة تعيين رمز الأقسام: "+e.message)}
 }
-async function changeCashierPasswordByOwner(){
-  if(!window.ownerMode)return alert("هذه العملية متاحة لحساب المالك فقط");
-  let email=document.getElementById("cashierManageEmail")?.value.trim().toLowerCase();
-  let pw=document.getElementById("cashierManageNewPass")?.value||"";
-  let cf=document.getElementById("cashierManageConfirmPass")?.value||"";
-  if(!email)return alert("أدخل البريد الإلكتروني لحساب الكاشير");
-  if(!email.includes("@"))return alert("أدخل بريداً إلكترونياً صحيحاً");
-  if(pw.length<8)return alert("كلمة مرور الكاشير يجب أن تكون 8 أحرف أو أكثر");
-  if(pw!==cf)return alert("كلمتا مرور الكاشير غير متطابقتين");
+async function resetEntireBusinessAccount(){
+  if(!window.ownerMode)return alert("تصفير الحساب متاح لحساب المالك فقط");
+  let confirmWord=prompt("⚠️ هذا الإجراء خطير ولا يمكن التراجع عنه. اكتب كلمة: تصفير");
+  if(confirmWord===null)return;
+  if(confirmWord.trim()!=="تصفير")return alert("لم يتم التصفير لأن كلمة التأكيد غير صحيحة");
+  let ownerPassword=prompt("🔐 للتأكيد النهائي، أدخل كلمة مرور حساب المالك الحالية:");
+  if(ownerPassword===null)return;
+  if(!ownerPassword)return alert("يجب إدخال كلمة مرور حساب المالك");
+  if(!confirm("سيتم حذف كل بيانات العمل من السحابة ومن هذا الجهاز: المنتجات، المبيعات، المشتريات، الديون والإغلاقات. حساب المالك وربط المتجر سيبقيان. هل أنت متأكد؟"))return;
   try{
     let token=await cloudToken();
-    let shopId=localStorage.getItem("posBlank40ShopId");
-    if(!shopId){let ctx=await getShopContext(token);shopId=ctx.shop_id;}
-    let r=await fetch(SUPABASE_URL+"/functions/v1/update-cashier-password",{
-      method:"POST",
-      headers:{...cloudHeaders(token),"Authorization":"Bearer "+token},
-      body:JSON.stringify({shop_id:shopId,email,password:pw})
-    });
-    let d=await r.json().catch(()=>({}));
-    if(!r.ok)throw Error(d.error||d.message||"تعذر تغيير كلمة مرور الكاشير");
-    ["cashierManageNewPass","cashierManageConfirmPass"].forEach(id=>{let el=document.getElementById(id);if(el)el.value=""});
-    alert("تم تغيير كلمة مرور الكاشير بنجاح. يستطيع الآن الدخول بكلمة المرور الجديدة.");
-  }catch(e){
-    alert("تعذر تغيير كلمة مرور الكاشير: "+e.message);
-  }
-}
-
-async function saveOwnerAccount(){
-  let email=document.getElementById("ownerUserNew")?.value.trim().toLowerCase(),pw=document.getElementById("ownerPassNew")?.value,cf=document.getElementById("ownerPassConfirm")?.value;
-  if(!email)return alert("أدخل البريد الإلكتروني لحساب المالك");
-  if(!email.includes("@"))return alert("أدخل بريداً إلكترونياً صحيحاً");
-  if(pw.length<6)return alert("كلمة مرور المالك يجب أن تكون 6 أحرف أو أكثر");
-  if(pw!==cf)return alert("كلمتا مرور المالك غير متطابقتين");
-  try{
-    let token=await cloudToken();
+    let me=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:cloudHeaders(token)});
+    let user=await me.json();
+    if(!me.ok||!user.email)throw Error("تعذر التحقق من حساب المالك");
+    let verify=await fetch(SUPABASE_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify({email:user.email,password:ownerPassword})});
+    let vd=await verify.json();
+    if(!verify.ok||!vd.access_token)return alert("كلمة مرور المالك غير صحيحة. لم يتم حذف أي شيء.");
     let shopId=localStorage.getItem("posBlank40ShopId");
     if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}
-    let r=await fetch(SUPABASE_URL+"/functions/v1/create-owner",{method:"POST",headers:{...cloudHeaders(token),"Authorization":"Bearer "+token},body:JSON.stringify({email,password:pw,shop_id:shopId})});
-    let d=await r.json();
-    if(!r.ok)throw Error(d.error||d.message||"تعذر إنشاء حساب المالك");
-    ["ownerUserNew","ownerPassNew","ownerPassConfirm"].forEach(id=>{let el=document.getElementById(id);if(el)el.value=""});
-    alert("تم إنشاء حساب المالك السحابي بنجاح. الآن يمكنك استخدام بريده وكلمة مروره من الحاسبة والآيفون.");
-  }catch(e){alert("تعذر إنشاء حساب المالك: "+e.message+"\nتأكد من تشغيل Edge Function الخاصة بحساب المالك.")}
+    resetBusinessData();
+    localStorage.removeItem("posBlank40SectionPass");
+    window.applyingCloud=true;
+    let body={shop_id:shopId,entity_type:"app_state",entity_id:shopId,payload:localSnapshot(),updated_at:new Date().toISOString(),updated_by:localStorage.getItem("posBlank40CloudUid")};
+    let row=await readCloudState(token,shopId),r;
+    if(row){r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync?id=eq."+encodeURIComponent(row.id),{method:"PATCH",headers:{...cloudHeaders(token),"Prefer":"return=representation","Content-Type":"application/json"},body:JSON.stringify(body)})}
+    else{r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync",{method:"POST",headers:{...cloudHeaders(token),"Prefer":"return=representation","Content-Type":"application/json"},body:JSON.stringify(body)})}
+    if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر تصفير البيانات السحابية")}
+    window.applyingCloud=false;
+    window.lastCloudStamp=body.updated_at;localStorage.setItem("posBlank40CloudStamp",body.updated_at);
+    page("sale");showCats();renderCart();cloudMessage("☁️ تم تصفير بيانات المتجر بنجاح",false);
+    alert("تم تصفير الحساب بنجاح. حساب المالك وربط المتجر بقيا محفوظين، والبرنامج جاهز للبدء من جديد.");
+  }catch(e){window.applyingCloud=false;alert("تعذر تصفير الحساب: "+e.message)}
 }
+
 async function saveSectionPassword(){
   let pw=document.getElementById("sectionPassNew").value,
       confirmPass=document.getElementById("sectionPassConfirm").value;
@@ -781,33 +744,6 @@ function notificationsPage(){document.getElementById("catalog").className="";doc
 <div>المتبقي: ${x.stock} ${x.unit==="kg"?"كغم":"قطعة"} — حد التنبيه: ${x.threshold}</div>
 </div>`).join("")||'<div class="notice">✅ لا توجد تنبيهات مخزون حالياً.</div>'}`}
 function clearPurchaseForm(){["buyNewName","buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnitCostCalc","supplier","buyAlertThreshold"].forEach(id=>{let e=document.getElementById(id);if(e)e.value=id==="buyPacks"||id==="buyPackSize"?"1":id==="buyUnitCostCalc"?"0 د.ع":""});let b=document.getElementById("buyProd");if(b)b.selectedIndex=0;updatePurchasePreview()}
-function renderCategoryManager(){
-  let el=document.getElementById("categoryManager");
-  if(!el)return;
-  el.innerHTML=`<div class="tablewrap" style="margin-top:10px">
-  <table><thead><tr><th>القسم</th><th>عدد المنتجات</th><th>الإجراء</th></tr></thead>
-  <tbody>${cats.map((c,i)=>`<tr><td><span style="font-size:20px">${c.icon||"📦"}</span> ${c.name}</td><td>${c.products.length}</td><td><button class="red" onclick="deleteCategory(${i})">🗑️ حذف</button></td></tr>`).join("")||'<tr><td colspan="3">لا توجد أقسام</td></tr>'}</tbody></table></div>`;
-}
-function addCategory(){
-  let name=(document.getElementById("newCategoryName")?.value||"").trim();
-  let icon=(document.getElementById("newCategoryIcon")?.value||"").trim()||"📦";
-  if(!name)return alert("اكتب اسم القسم أولاً");
-  if(cats.some(c=>c.name.trim().toLowerCase()===name.toLowerCase()))return alert("هذا القسم موجود مسبقاً");
-  cats.push({name,icon,products:[]});
-  save();
-  document.getElementById("newCategoryName").value="";
-  document.getElementById("newCategoryIcon").value="";
-  renderCategoryManager();
-  if(current==="sale")showCats();
-  alert("تمت إضافة القسم: "+name);
-}
-function deleteCategory(i){
-  let c=cats[i]; if(!c)return;
-  if(c.products.length)return alert("لا يمكن حذف قسم يحتوي على منتجات. احذف منتجاته أولاً.");
-  if(!confirm("حذف قسم «"+c.name+"»؟"))return;
-  cats.splice(i,1); save(); renderCategoryManager();
-  if(current==="sale")showCats();
-}
 function debtsPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="سجل الديون";document.getElementById("hint").textContent="اضغط على اسم الشخص لعرض المنتجات التي أخذها بالدين";let names=[...new Set(debts.map(d=>d.debtor))],total=debts.reduce((a,d)=>a+Math.max(0,d.amount-d.paid),0);document.getElementById("catalog").innerHTML=`<div class="head" style="margin-bottom:10px">
 <div><h3 style="margin:0">إدارة الديون</h3><div class="muted">أضف ديناً يدوياً حتى لو لم تكن هناك فاتورة بيع.</div></div>
 <button class="blue" onclick="addDebt()">➕ إضافة ديون</button>
@@ -1109,160 +1045,48 @@ function exportData(){let data={categories:cats,sales,purchases,debts},blob=new 
 function searchProducts(){let q=document.getElementById("search").value.trim().toLowerCase();if(!q){showCats();return}document.getElementById("heading").textContent="نتائج البحث";document.getElementById("hint").textContent="اختر المنتج لإضافته للفاتورة";document.getElementById("back").style.display="inline-block";let a=[];cats.forEach((c,ci)=>c.products.forEach((p,pi)=>{if(p.name.toLowerCase().includes(q))a.push({...p,icon:c.icon,category:ci,index:pi})}));draw(a)}
 showCats();renderCart();
 
-let authMode="login",authRole="cloud";
-function setAuthRole(role){authRole=role;if(role==="owner")authMode="login";renderAuth(authMode)}
-function renderAuth(mode="login"){
-  authMode=mode;
-  let owner=authRole==="owner";
-  document.getElementById("authTitle").textContent=owner?"دخول حساب المالك":(mode==="signup"?"إنشاء حساب سحابي جديد":"تسجيل الدخول إلى الحساب السحابي");
-  document.getElementById("authDesc").textContent=owner?"ادخل بحساب المالك السحابي للوصول إلى جميع الأقسام بدون رمز":"استخدم حسابك السحابي نفسه على الحاسبة والآيفون";
-  document.getElementById("authSubmit").textContent=mode==="signup"?"إنشاء الحساب":"تسجيل الدخول";
-  document.getElementById("authSwitch").style.display=owner?"none":"block";
-  document.getElementById("authSwitch").textContent=mode==="signup"?"لديك حساب؟ تسجيل الدخول":"إنشاء حساب جديد";
-  document.getElementById("authCloudBtn").className=owner?"gray":"blue";
-  document.getElementById("authOwnerBtn").className=owner?"blue":"gray";
+let authMode="login",authRole="auto";
+function renderAuth(){
+  authMode="login";
+  authRole="auto";
+  document.getElementById("authTitle").textContent="تسجيل الدخول";
+  document.getElementById("authDesc").textContent="أدخل البريد الإلكتروني وكلمة المرور، وسيتم تحديد الحساب والصلاحيات تلقائياً";
+  document.getElementById("authSubmit").textContent="تسجيل الدخول";
   document.getElementById("authFields").innerHTML=`<label>البريد الإلكتروني</label>
-<input id="authUser" type="email" autocomplete="username" placeholder="${owner?"بريد حساب المالك":"البريد الإلكتروني"}">
+<input id="authUser" type="email" autocomplete="username" placeholder="البريد الإلكتروني">
 <label>كلمة المرور</label>
-<input id="authPass" type="password" autocomplete="${mode==="signup"?"new-password":"current-password"}" placeholder="${owner?"كلمة مرور حساب المالك":(mode==="signup"?"أنشئ كلمة مرور للحساب":"كلمة مرور الحساب السحابي")}">${mode==="signup"?'<label>تأكيد كلمة المرور</label>\n<input id="authPassConfirm" type="password" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور">':''}`;
+<input id="authPass" type="password" autocomplete="current-password" placeholder="كلمة المرور">`;
   document.getElementById("authVeil").style.display="flex";
 }
-async function forgotCloudPassword(){
-  let email=(document.getElementById("authUser")?.value||"").trim().toLowerCase();
-  if(!email)return alert("اكتب البريد الإلكتروني للحساب أولاً");
-  if(!email.includes("@"))return alert("أدخل بريداً إلكترونياً صحيحاً");
-  try{
-    let redirectTo="https://husseinaljamale2000-maker.github.io/abu-adnan-pos/";
-    if(!/^https?:$/i.test(window.location.protocol)){
-      return alert("إعادة تعيين كلمة المرور عبر البريد تحتاج فتح البرنامج من رابط HTTPS. بعد رفع البرنامج على الموقع ستعمل هذه الخاصية.");
-    }
-    let r=await fetch(SUPABASE_URL+"/auth/v1/recover",{
-      method:"POST",
-      headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},
-      body:JSON.stringify({email,redirect_to:redirectTo})
-    });
-    let d=await r.json().catch(()=>({}));
-    if(!r.ok)throw Error(d.msg||d.message||d.error_description||"تعذر إرسال رابط الاستعادة");
-    alert("تم إرسال رابط إعادة تعيين كلمة المرور إلى البريد الإلكتروني إذا كان الحساب موجوداً. افتح الرابط وأنشئ كلمة مرور جديدة.");
-  }catch(e){alert("تعذر إرسال رابط استعادة كلمة المرور: "+e.message)}
-}
-function showPasswordRecovery(accessToken,refreshToken){
-  if(!accessToken)return false;
-  const veil=document.getElementById("authVeil");
-  if(!veil)return false;
-  veil.style.display="flex";
-  veil.innerHTML=`<div class="authcard">
-    <div style="text-align:center;font-size:42px">🔐</div>
-    <h2 style="text-align:center">إعادة تعيين كلمة المرور</h2>
-    <p style="text-align:center">اكتب كلمة المرور الجديدة للحساب</p>
-    <label>كلمة المرور الجديدة</label>
-    <input id="recoveryNewPass" type="password" autocomplete="new-password" placeholder="8 أحرف أو أرقام على الأقل">
-    <label>تأكيد كلمة المرور</label>
-    <input id="recoveryConfirmPass" type="password" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور">
-    <button class="blue" id="recoverySaveBtn" onclick="finishPasswordRecovery()">💾 حفظ كلمة المرور الجديدة</button>
-    <button class="gray" onclick="location.hash='';renderAuth('login')">إلغاء</button>
-    <p id="recoveryMsg" class="authnote"></p>
-  </div>`;
-  window.recoveryAccessToken=accessToken;
-  window.recoveryRefreshToken=refreshToken||"";
-  return true;
-}
-async function finishPasswordRecovery(){
-  const nw=(document.getElementById("recoveryNewPass")?.value||"");
-  const cf=(document.getElementById("recoveryConfirmPass")?.value||"");
-  const msg=document.getElementById("recoveryMsg");
-  if(nw.length<8)return alert("اجعل كلمة المرور 8 أحرف أو أرقام على الأقل");
-  if(nw!==cf)return alert("كلمتا المرور غير متطابقتين");
-  const token=window.recoveryAccessToken;
-  if(!token)return alert("انتهت صلاحية رابط الاستعادة. اطلب رابطاً جديداً.");
-  const btn=document.getElementById("recoverySaveBtn");
-  if(btn){btn.disabled=true;btn.textContent="جارٍ حفظ كلمة المرور...";}
-  try{
-    const r=await fetch(SUPABASE_URL+"/auth/v1/user",{
-      method:"PUT",
-      headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Authorization":"Bearer "+token,"Content-Type":"application/json"},
-      body:JSON.stringify({password:nw})
-    });
-    const d=await r.json().catch(()=>({}));
-    if(!r.ok)throw Error(d.msg||d.message||d.error_description||"تعذر تغيير كلمة المرور");
-    localStorage.removeItem("posBlank40CloudAccess");
-    localStorage.removeItem("posBlank40CloudRefresh");
-    localStorage.removeItem("posBlank40CloudRefreshKeep");
-    localStorage.removeItem("posBlank40CloudUid");
-    localStorage.removeItem("posBlank40AuthUid");
-    localStorage.removeItem("posBlank40ShopId");
-    localStorage.removeItem("posBlank40Role");
-    window.recoveryAccessToken="";
-    window.recoveryRefreshToken="";
-    history.replaceState(null,document.title,window.location.pathname+window.location.search);
-    alert("تم تغيير كلمة المرور بنجاح. ارجع وسجّل الدخول بكلمة المرور الجديدة.");
-    renderAuth("login");
-  }catch(e){
-    if(msg)msg.textContent="تعذر تغيير كلمة المرور: "+e.message;
-    alert("تعذر تغيير كلمة المرور: "+e.message);
-  }finally{if(btn){btn.disabled=false;btn.textContent="💾 حفظ كلمة المرور الجديدة";}}
-}
-function checkPasswordRecoveryLink(){
-  const rawHash=(location.hash||"").replace(/^#/,"");
-  const hash=new URLSearchParams(rawHash);
-  const type=hash.get("type");
-  let accessToken=hash.get("access_token");
-  let refreshToken=hash.get("refresh_token");
-
-  // Handle an accidentally nested GitHub Pages URL such as:
-  // #access_token=https://.../#access_token=REAL_TOKEN...
-  // by extracting the real JWT before validation.
-  if(accessToken && accessToken.includes("#access_token=")){
-    accessToken=accessToken.split("#access_token=").pop().split("&")[0];
-  }
-  if(refreshToken && refreshToken.includes("#")){
-    refreshToken=refreshToken.split("#")[0];
-  }
-
-  if(accessToken && accessToken.includes("https://")){
-    const m=accessToken.match(/#access_token=([^&]+)/);
-    if(m) accessToken=m[1];
-  }
-
-  if(type==="recovery"&&accessToken){
-    return showPasswordRecovery(accessToken,refreshToken);
-  }
-  return false;
-}
-function toggleAuthMode(){if(authRole==="owner")return;renderAuth(authMode==="login"?"signup":"login")}
 function revealSettings(){let b=document.getElementById("nav-settings");if(b){b.style.display="inline-block";b.removeAttribute("aria-hidden");}}
 let titleTapCount=0,titleTapTimer=null;
-function handleTitleTap(){if(!window.ownerMode)return;titleTapCount++;clearTimeout(titleTapTimer);titleTapTimer=setTimeout(()=>titleTapCount=0,1400);if(titleTapCount>=5){titleTapCount=0;revealSettings();if(current==="settings"){let p=document.getElementById("ownerSettings");if(p)p.style.display=p.style.display==="none"?"block":"none";}else alert("تم إظهار الإعدادات");}}
+function handleTitleTap(){if(!window.ownerMode)return;revealSettings();if(current!=="settings")return;let p=document.getElementById("ownerSettings");if(p)p.style.display="block";}
 document.addEventListener("DOMContentLoaded",function(){let t=document.getElementById("appTitle");if(t){t.addEventListener("click",handleTitleTap);t.addEventListener("touchend",function(e){e.preventDefault();handleTitleTap()},{passive:false})}});
-document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.altKey&&e.shiftKey&&(e.key==="o"||e.key==="O")){e.preventDefault();if(!window.ownerMode){alert("اختصار إعدادات المالك متاح لحساب المالك فقط");return;}revealSettings();let panel=document.getElementById("ownerSettings");if(panel&&current==="settings")panel.style.display=panel.style.display==="none"?"block":"none";}});
+document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.altKey&&e.shiftKey&&(e.key==="o"||e.key==="O")){e.preventDefault();if(!window.ownerMode)return;revealSettings();let panel=document.getElementById("ownerSettings");if(panel&&current==="settings")panel.style.display="block";}});
 window.ownerMode=false;
 async function submitAuth(){
-  let email=document.getElementById("authUser").value.trim().toLowerCase(),password=document.getElementById("authPass").value,mode=authMode;
+  let email=document.getElementById("authUser").value.trim().toLowerCase(),password=document.getElementById("authPass").value;
   if(!email||!password)return alert("أدخل البريد الإلكتروني وكلمة المرور");
-  if(authRole==="cloud"&&mode==="signup"&&password!==document.getElementById("authPassConfirm").value)return alert("كلمتا المرور غير متطابقتين");
-  if(authRole==="cloud"&&mode==="signup"&&password.length<6)return alert("كلمة المرور يجب ألا تقل عن 6 أحرف");
-  let btn=document.getElementById("authSubmit");btn.disabled=true;btn.textContent=mode==="signup"?"جارٍ إنشاء الحساب...":"جارٍ تسجيل الدخول...";
+  let btn=document.getElementById("authSubmit");btn.disabled=true;btn.textContent="جارٍ تسجيل الدخول...";
   try{
-    let signup=authRole==="cloud"&&mode==="signup",url=SUPABASE_URL+(signup?"/auth/v1/signup":"/auth/v1/token?grant_type=password"),payload={email,password};
+    let url=SUPABASE_URL+"/auth/v1/token?grant_type=password",payload={email,password};
     let r=await fetch(url,{method:"POST",headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify(payload)}),d=await r.json();
-    if(!r.ok)throw Error(d.msg||d.message||d.error_description||"تعذر إكمال العملية");
-    if(signup&&!d.access_token){alert("تم إرسال طلب إنشاء الحساب. افحص بريدك الإلكتروني لتأكيد الحساب، ثم ارجع وسجّل الدخول.");renderAuth("login");document.getElementById("authUser").value=email;return;}
+    if(!r.ok)throw Error(d.msg||d.message||d.error_description||"تعذر تسجيل الدخول");
     if(!d.access_token||!d.user?.id)throw Error("لم يرجع الخادم جلسة دخول صالحة");
     localStorage.setItem("posBlank40CloudAccess",d.access_token);localStorage.setItem("posBlank40CloudRefresh",d.refresh_token||"");localStorage.setItem("posBlank40CloudRefreshKeep",d.refresh_token||"");localStorage.setItem("posBlank40CloudUid",d.user.id);localStorage.setItem("posBlank40AuthUid",d.user.id);
     let ctx=await getShopContext(d.access_token);
-    if(authRole==="owner"){
-      if(ctx.role!=="owner")throw Error("هذا الحساب ليس حساب مالك للمتجر");
-      window.ownerMode=true;
-    }else{
-      window.ownerMode=ctx.role==="owner";
-    }
+    if(!ctx||!ctx.role)throw Error("هذا الحساب غير مرتبط بمتجر أو لم يتم تحديد صلاحيته");
+    window.ownerMode=ctx.role==="owner";
+    localStorage.setItem("posBlank40Role",ctx.role);
     document.getElementById("authVeil").style.display="none";
     await initializeAutoSync();
     applyAccessMode();
-    if(window.ownerMode&&authRole==="cloud")alert("الحساب الحالي مُسجل مؤقتاً كمالك في قاعدة البيانات. أنشئ حساب المالك الجديد من إعدادات المالك، وبعدها سنحوّل هذا الحساب إلى كاشير.");
-    else alert(authRole==="owner"?"تم تسجيل دخول حساب المالك. جميع الأقسام مفتوحة ونفس بيانات المتجر.":(signup?"تم إنشاء الحساب وتسجيل الدخول بنجاح":"تم تسجيل الدخول بنجاح"));
-  }catch(e){alert((authRole==="owner"?"تعذر تسجيل دخول المالك: ":mode==="signup"?"تعذر إنشاء الحساب: ":"تعذر تسجيل الدخول: ")+e.message)}
-  finally{btn.disabled=false;btn.textContent=authMode==="signup"?"إنشاء الحساب":"تسجيل الدخول"}
+    alert(window.ownerMode?"تم تسجيل دخول حساب المالك. جميع أقسام المالك مفتوحة.":"تم تسجيل دخول حساب الكاشير. الأقسام المحمية تحتاج رمز الأقسام.");
+  }catch(e){
+    alert("تعذر تسجيل الدخول: "+e.message);
+    ["posBlank40CloudAccess","posBlank40CloudRefresh","posBlank40CloudRefreshKeep","posBlank40CloudUid","posBlank40AuthUid","posBlank40ShopId","posBlank40Role"].forEach(k=>localStorage.removeItem(k));
+    window.ownerMode=false;
+  }finally{btn.disabled=false;btn.textContent="تسجيل الدخول"}
 }
 function applyAccessMode(){
   revealSettings();
@@ -1272,7 +1096,6 @@ function applyAccessMode(){
 function logout(){window.ownerMode=false;sectionUnlockUntil=0;clearTimeout(autoPushTimer);if(autoPullTimer)clearInterval(autoPullTimer);window.autoSyncReady=false;localStorage.removeItem("posBlank40CloudAccess");localStorage.removeItem("posBlank40CloudRefresh");localStorage.removeItem("posBlank40CloudRefreshKeep");localStorage.removeItem("posBlank40CloudUid");localStorage.removeItem("posBlank40LinkedUid");localStorage.removeItem("posBlank40AuthUid");localStorage.removeItem("posBlank40ShopId");localStorage.removeItem("posBlank40Role");renderAuth("login");document.getElementById("authPass").value=""}
 
 renderAuth();
-setTimeout(function(){checkPasswordRecoveryLink();},0);
 
 </script>
 </body>
