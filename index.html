@@ -113,7 +113,7 @@
 </div>
 </div>
 <script>
-const seed=[["الجكاير","🚬",[["ماستر إيزي نعناع",1250],["ماستر إيزي أحمر",1250],["كنت أزرق",1500],["كنت أبيض",1500],["مارلبورو أحمر",1750],["مارلبورو ذهبي",1750],["دافيدوف كلاسيك",2000],["LM أزرق",1250]]],["اللحوم والدواجن","🥩",[["لحم غنم",14000,"kg"],["لحم عجل",12000,"kg"],["دجاج كامل",4000],["أجنحة دجاج",5000,"kg"]]],["الخضروات والفواكه","🥦",[["طماطم",1000,"kg"],["بطاطا",1000,"kg"],["خيار",1000,"kg"],["موز",2000,"kg"]]],["المعلبات","🥫",[["معجون طماطم",1000],["فاصوليا معلبة",1250],["تونة",2000]]],["الأجبان والألبان","🧀",[["حليب 1 لتر",1500],["لبن",1000],["جبن مثلثات",2000]]],["المشروبات","🥤",[["كولا 330ml",750],["بيبسي 330ml",750],["ماء صغير",250],["ماء كبير 1.5L",500]]],["القرطاسية","✏️",[["دفتر",1000],["قلم جاف",500],["قلم رصاص",250]]],["المنظفات","🧴",[["سائل غسيل",5000],["صابون",1000],["سائل جلي",2000]]],["المواد الغذائية","🛍️",[["رز 1 كغم",2000],["سكر 1 كغم",1500],["زيت 1 لتر",2500]]],["الخبز والمعجنات","🥖",[["صمون",250],["خبز",500]]],["المكسرات","🥜",[["فستق",12000,"kg"],["لوز",10000,"kg"]]],["الحلويات والشوكولاتة","🍫",[["شوكولاتة",1000],["بسكويت",750]]],["المثلجات","🍦",[["آيس كريم",1500]]],["الاحتياجات المنزلية","🏠",[["مناديل",1000]]],["العطور ومستحضرات العناية","🧴",[["شامبو",4000]]],["أخرى","📦",[["منتج متنوع",1000]]]];
+const seed=[["الجكاير","🚬",[["ماستر إيزي نعناع",1250],["ماستر إيزي أحمر",1250],["كنت أزرق",1500],["كنت أبيض",1500],["مارلبورو أحمر",1750],["مارلبورو ذهبي",1750],["دافيدوف كلاسيك",2000],["LM أزرق",1250]]],["اللحوم والدواجن","🥩",[["لحم غنم",14000,"kg"],["لحم عجل",12000,"kg"],["دجاج كامل",4000],["أجنحة دجاج",5000,"kg"]]],["المعلبات","🥫",[["معجون طماطم",1000],["فاصوليا معلبة",1250],["تونة",2000]]],["الأجبان والألبان","🧀",[["حليب 1 لتر",1500],["لبن",1000],["جبن مثلثات",2000]]],["المشروبات","🥤",[["كولا 330ml",750],["بيبسي 330ml",750],["ماء صغير",250],["ماء كبير 1.5L",500]]],["القرطاسية","✏️",[["دفتر",1000],["قلم جاف",500],["قلم رصاص",250]]],["المنظفات","🧴",[["سائل غسيل",5000],["صابون",1000],["سائل جلي",2000]]],["المواد الغذائية","🛍️",[["رز 1 كغم",2000],["سكر 1 كغم",1500],["زيت 1 لتر",2500]]],["الخبز والمعجنات","🥖",[["صمون",250],["خبز",500]]],["المكسرات","🥜",[["فستق",12000,"kg"],["لوز",10000,"kg"]]],["الحلويات والشوكولاتة","🍫",[["شوكولاتة",1000],["بسكويت",750]]],["المثلجات","🍦",[["آيس كريم",1500]]],["الاحتياجات المنزلية","🏠",[["مناديل",1000]]],["العطور ومستحضرات العناية","🧴",[["شامبو",4000]]],["أخرى","📦",[["منتج متنوع",1000]]]];
 let cats=JSON.parse(localStorage.getItem("posBlank40Cats")||"null")||seed.map(c=>({name:c[0],icon:c[1],products:[]}));
 function ensureWeightCategory(){
   let c=cats.find(x=>x.name==="الكميات بالوزن");
@@ -132,6 +132,28 @@ function normalizeCategoryMethods(){
   });
 }
 normalizeCategoryMethods();
+cats=cats.filter(c=>c.name!=="الخضروات والفواكه");
+// أقسام إضافية ثابتة: الألعاب والأجباس، وطريقة شرائها بالكارتون/الباكيت.
+function ensureExtraSections(){
+  const extras=[
+    {name:"الألعاب",icon:"🧸",purchaseMethod:"package"},
+    {name:"الأجباس",icon:"🍟",purchaseMethod:"package"}
+  ];
+  extras.forEach(e=>{
+    let c=cats.find(x=>x.name===e.name);
+    if(!c){
+      cats.push({name:e.name,icon:e.icon,purchaseMethod:e.purchaseMethod,products:[]});
+    }else{
+      c.icon=e.icon;
+      c.purchaseMethod=e.purchaseMethod;
+      c.products=Array.isArray(c.products)?c.products:[];
+    }
+  });
+}
+ensureExtraSections();
+localStorage.setItem("posBlank40Cats",JSON.stringify(cats));
+let cannedCat=cats.find(c=>c.name==="المعلبات");
+if(cannedCat)cannedCat.purchaseMethod="package";
 if(localStorage.getItem("posBlank40ProductsClearedV1")!=="yes"){cats=cats.map(c=>({...c,products:[]}));localStorage.setItem("posBlank40ProductsClearedV1","yes");localStorage.setItem("posBlank40Cats",JSON.stringify(cats));}
 cats.forEach(c=>c.products.forEach(p=>{if(p.cost===undefined)p.cost=0;if(p.stock===undefined)p.stock=0;if(!p.unit)p.unit="piece"}));
 let cart=[],active=-1,current="sale",sales=JSON.parse(localStorage.getItem("posBlank40Sales")||"[]"),purchases=JSON.parse(localStorage.getItem("posBlank40Purchases")||"[]"),closedDays=JSON.parse(localStorage.getItem("posBlank40ClosedDays")||"[]"),debts=JSON.parse(localStorage.getItem("posBlank40Debts")||"[]"),activeSalesDay=localStorage.getItem("posBlank40ActiveSalesDay")||null;
@@ -537,14 +559,75 @@ function showCat(i){active=i;document.getElementById("heading").textContent=cats
 function draw(arr){let el=document.getElementById("catalog");el.className="grid";el.innerHTML="";arr.forEach(p=>{let b=document.createElement("button");b.className="tile"+(p.price!==undefined&&p.stock<=0?" unavailable":"");b.innerHTML=`<span class="emoji">${p.icon||"🛍️"}</span>
 <strong>${p.name}</strong>${p.price!==undefined?`<div class="price">${fmt(p.price)} ${p.unit==="kg"?"/ كغم":""}</div>
 <div class="stock">الكمية: ${p.stock} ${p.unit==="kg"?"كغم":"قطعة"}<br>${stockStatus(p.stock)}</div>`:""}`;if(p.price!==undefined&&p.stock<=0){b.disabled=true;b.title="هذا المنتج غير متوفر حالياً"}b.onclick=()=>p.category!==undefined?(p.index===undefined?showCat(p.category):add(p.category,p.index)):null;el.appendChild(b)})}
-function add(ci,pi){let p=cats[ci].products[pi];if(p.stock<=0)return alert("هذا المنتج غير متوفر حالياً");let f=cart.find(x=>x.ci===ci&&x.pi===pi);if(p.unit==="kg"){document.getElementById("modalTitle").textContent="⚖️ بيع بالكيلو والغرام";document.getElementById("modalBody").innerHTML=`<div style="max-width:460px;margin:auto">
-<p><b>${p.name}</b></p><p>سعر الكيلو: <b>${fmt(p.price)}</b></p>
-<label>أدخل المبلغ الذي يريده الزبون (د.ع)<input id="weightMoney" type="number" min="1" step="1" value="250" oninput="previewWeightMoney(${ci},${pi})"></label>
-<div id="weightMoneyPreview" class="notice" style="margin-top:10px"></div>
-<div class="actions"><button class="blue" onclick="weightedByMoney(${ci},${pi})">➕ إضافة للفاتورة</button></div></div>`;openModal();previewWeightMoney(ci,pi);return}if((f?f.qty:0)+1>p.stock)return alert("الكمية المتوفرة من "+p.name+" هي "+p.stock+" فقط، لا يمكن إضافة كمية أكثر");if(f)f.qty++;else cart.push({name:p.name,price:+p.price,cost:+p.cost,qty:1,unit:p.unit,ci,pi});renderCart()}
-function previewWeightMoney(ci,pi){let p=cats[ci].products[pi],money=Number(document.getElementById("weightMoney")?.value)||0,kg=p.price>0?money/p.price:0,g=kg*1000,el=document.getElementById("weightMoneyPreview");if(el)el.innerHTML=`المبلغ <b>${fmt(money)}</b> = <b>${g.toFixed(2)} غرام</b> = <b>${kg.toFixed(5)} كغم</b>`}
-function weightedByMoney(ci,pi){let p=cats[ci].products[pi],money=Number(document.getElementById("weightMoney")?.value),already=cart.filter(x=>x.ci===ci&&x.pi===pi).reduce((sum,x)=>sum+x.qty,0);if(p.stock<=0)return alert("هذا المنتج غير متوفر حالياً");if(!Number.isFinite(money)||money<=0)return alert("أدخل مبلغاً صحيحاً");let q=p.price>0?money/p.price:0;if(q<=0)return alert("تعذر حساب الوزن");if(already+q>p.stock+1e-9)return alert("الكمية المتوفرة من "+p.name+" هي "+(p.stock*1000).toFixed(2)+" غرام فقط");cart.push({name:p.name,price:+p.price,cost:+p.cost,qty:+q.toFixed(6),unit:"kg",ci,pi,weightSaleMoney:+money.toFixed(2)});closeModal();renderCart()}
-function weighted(ci,pi){let q=+document.getElementById("weight")?.value||0; if(q<=0)return alert("أدخل وزناً صحيحاً");let p=cats[ci].products[pi],already=cart.filter(x=>x.ci===ci&&x.pi===pi).reduce((sum,x)=>sum+x.qty,0);if(already+q>p.stock)return alert("الكمية المتوفرة من "+p.name+" هي "+p.stock+" كغم فقط");cart.push({name:p.name,price:+p.price,cost:+p.cost,qty:q,unit:"kg",ci,pi});closeModal();renderCart()}
+function add(ci,pi){
+  let p=cats[ci].products[pi];
+  if(p.stock<=0)return alert("هذا المنتج غير متوفر حالياً");
+  let f=cart.find(x=>x.ci===ci&&x.pi===pi);
+  if(p.unit==="kg"){
+    showWeightMoneyChoices(ci,pi);
+    return;
+  }
+  if((f?f.qty:0)+1>p.stock)return alert("الكمية المتوفرة من "+p.name+" هي "+p.stock+" فقط، لا يمكن إضافة كمية أكثر");
+  if(f)f.qty++;
+  else cart.push({name:p.name,price:+p.price,cost:+p.cost,qty:1,unit:p.unit,ci,pi});
+  renderCart();
+}
+
+function showWeightMoneyChoices(ci,pi){
+  let p=cats[ci].products[pi];
+  document.getElementById("modalTitle").textContent="⚖️ اختر قيمة البيع — "+p.name;
+  const values=[];
+  for(let v=250;v<=5000;v+=250)values.push(v);
+  document.getElementById("modalBody").innerHTML=`
+    <div style="max-width:620px;margin:auto">
+      <p style="text-align:center"><b>${p.name}</b></p>
+      <p style="text-align:center">سعر الكيلو: <b>${fmt(p.price)}</b></p>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
+        ${values.map(v=>`<button class="blue" style="padding:15px 6px;font-size:16px" onclick="weightedByMoney(${ci},${pi},${v})">${fmt(v)}</button>`).join("")}
+      </div>
+      <div class="notice" style="margin-top:14px;text-align:center">
+        اختر المبلغ المطلوب للبيع من الأزرار أعلاه.<br>
+        من 250 د.ع إلى 5000 د.ع بزيادة 250 د.ع.
+      </div>
+    </div>`;
+  openModal();
+}
+
+function weightedByMoney(ci,pi,money){
+  let p=cats[ci].products[pi];
+  let already=cart.filter(x=>x.ci===ci&&x.pi===pi).reduce((sum,x)=>sum+x.qty,0);
+  if(p.stock<=0)return alert("هذا المنتج غير متوفر حالياً");
+  money=Number(money);
+  if(!Number.isFinite(money)||money<=0)return alert("قيمة البيع غير صحيحة");
+  let q=p.price>0?money/p.price:0;
+  if(q<=0)return alert("تعذر حساب الوزن");
+  if(already+q>p.stock+1e-9){
+    return alert("الكمية المتوفرة من "+p.name+" هي "+(p.stock*1000).toFixed(2)+" غرام فقط");
+  }
+  cart.push({
+    name:p.name,
+    price:+p.price,
+    cost:+p.cost,
+    qty:+q.toFixed(6),
+    unit:"kg",
+    ci,
+    pi,
+    weightSaleMoney:+money.toFixed(2)
+  });
+  closeModal();
+  renderCart();
+}
+
+function weighted(ci,pi){
+  let q=+document.getElementById("weight")?.value||0;
+  if(q<=0)return alert("أدخل وزناً صحيحاً");
+  let p=cats[ci].products[pi],
+      already=cart.filter(x=>x.ci===ci&&x.pi===pi).reduce((sum,x)=>sum+x.qty,0);
+  if(already+q>p.stock)return alert("الكمية المتوفرة من "+p.name+" هي "+p.stock+" كغم فقط");
+  cart.push({name:p.name,price:+p.price,cost:+p.cost,qty:q,unit:"kg",ci,pi});
+  closeModal();
+  renderCart();
+}
 function renderCart(){let el=document.getElementById("cart");el.innerHTML="";cart.forEach((p,i)=>{let d=document.createElement("div");d.className="cartrow";d.innerHTML=`<div>
 <b>${p.name}</b>
 <small>${fmt(p.price)} ${p.unit==="kg"?"/ كغم":"/ قطعة"}</small>
@@ -677,6 +760,7 @@ let stockActive=-1;function stockBack(){if(current!=="stock"){showCats();return}
 </div>
 </div>
 <div class="actions">
+<button class="green" onclick="openStockAddProduct()">➕ إضافة منتجات للمخزون</button>
 <button class="red" onclick="stockFilterView('out')">🔴 المنتجات غير المتوفرة</button>
 <button class="yellow" onclick="stockFilterView('low')">🟡 المنتجات قليلة (أقل من 5)</button>
 </div>
@@ -748,7 +832,77 @@ let stockActive=-1;function stockBack(){if(current!=="stock"){showCats();return}
 <td>${stockStatus(p.stock)}</td>
 </tr>`).join("")||'<tr><td colspan="6">لا توجد منتجات بهذا القسم</td></tr>'}</tbody>
 </table>
-</div>`}function stockFilterView(mode){let rows=cats.flatMap(c=>c.products.filter(p=>mode==="out"?p.stock<=0:p.stock>0&&p.stock<5).map(p=>({cat:c.name,p}))),el=document.getElementById("catalog");document.getElementById("heading").textContent=mode==="out"?"المنتجات غير المتوفرة":"المنتجات قليلة المخزون";document.getElementById("hint").textContent=mode==="out"?"المنتجات التي نفد مخزونها":"المنتجات التي بقي منها أقل من 5 وحدات";document.getElementById("back").style.display="inline-block";document.getElementById("back").onclick=stockPage;el.className="";el.innerHTML=`<div class="actions">
+</div>`}function openStockAddProduct(){
+  document.getElementById("modalTitle").textContent="➕ إضافة منتجات مباشرة إلى المخزون";
+  document.getElementById("modalBody").innerHTML=`
+  <p class="muted">هذه العملية تضيف الكمية مباشرة إلى المخزون ولا تُسجَّل كفاتورة شراء.</p>
+  <div class="fields">
+    <label>القسم الرئيسي<select id="stockAddCat" onchange="stockAddCategoryChanged()">${cats.map((c,i)=>`<option value="${i}">${c.name} — ${purchaseMethodLabel(c)}</option>`).join("")}</select></label>
+    <label>المنتج<select id="stockAddProd" onchange="stockAddProductChanged()"></select></label>
+    <label id="stockAddNewNameLabel" style="display:none">اسم المنتج الجديد<input id="stockAddNewName" placeholder="اسم المنتج"></label>
+    <label id="stockAddPacksLabel">الكمية الموجودة / المضافة<input id="stockAddPacks" type="number" min=".001" step=".001" value="1"></label>
+    <label id="stockAddPackSizeLabel">عدد العلب / الوحدات داخل الكرتون أو الباكيت<input id="stockAddPackSize" type="number" min=".001" step=".001" value="1"></label>
+    <label id="stockAddPackCostLabel">سعر شراء الكرتون / الباكيت بالكامل (د.ع)<input id="stockAddPackCost" type="number" min="0" value="0"></label>
+    <label>سعر شراء الوحدة الواحدة (يُحسب تلقائياً)<input id="stockAddUnitCost" type="text" readonly value="0 د.ع"></label>
+    <label>سعر بيع الوحدة الواحدة (د.ع)<input id="stockAddUnitPrice" type="number" min="0" value="0"></label>
+    <label>طريقة شراء القسم<input id="stockAddUnit" type="text" readonly value=""></label>
+    <label>حد تنبيه المخزون<input id="stockAddThreshold" type="number" min="0" step=".001" value="0"></label>
+  </div>
+  <div class="cards" style="margin-top:12px">
+    <div class="stat"><span>الكمية التي ستضاف للمخزون</span><b id="stockAddPreviewQty">0</b></div>
+    <div class="stat"><span>تكلفة الوحدة</span><b id="stockAddPreviewCost">0 د.ع</b></div>
+    <div class="stat"><span>الربح المتوقع للوحدة</span><b id="stockAddPreviewProfit">0 د.ع</b></div>
+  </div>
+  <div class="actions"><button class="green" onclick="saveStockAddProduct()">💾 إضافة للمخزون</button><button class="gray" onclick="closeModal()">إلغاء</button></div>`;
+  openModal();
+  stockAddCategoryChanged();
+  ["stockAddPacks","stockAddPackSize","stockAddPackCost","stockAddUnitPrice"].forEach(id=>document.getElementById(id)?.addEventListener("input",updateStockAddPreview));
+}
+function stockAddCategoryChanged(){
+  let ci=+document.getElementById("stockAddCat").value,sel=document.getElementById("stockAddProd");
+  sel.innerHTML=`<option value="">اختر المنتج</option>`+cats[ci].products.map((p,pi)=>`<option value="${pi}">${p.name}</option>`).join("")+`<option value="new">＋ إضافة منتج جديد</option>`;
+  sel.value="";stockAddProductChanged();
+}
+function stockAddProductChanged(){
+  let ci=+document.getElementById("stockAddCat").value,val=document.getElementById("stockAddProd").value,isNew=val==="new",p=(!isNew&&val!=="")?cats[ci].products[+val]:null,method=categoryPurchaseMethod(cats[ci]);
+  document.getElementById("stockAddNewNameLabel").style.display=isNew?"block":"none";
+  document.getElementById("stockAddNewName").value="";
+  document.getElementById("stockAddUnit").value=purchaseMethodLabel(cats[ci]);
+  document.getElementById("stockAddPacks").value="";
+  document.getElementById("stockAddPackSize").value=method==="package"?(p?.packSize||1):1;
+  document.getElementById("stockAddPackCost").value=p?(method==="package"?((p.cost||0)*(p.packSize||1)):(p.cost||0)):0;
+  document.getElementById("stockAddUnitPrice").value=p?(p.price||0):0;
+  document.getElementById("stockAddThreshold").value=p?(p.alertThreshold??0):0;
+  let l=document.getElementById("stockAddPacksLabel"),s=document.getElementById("stockAddPackSizeLabel"),c=document.getElementById("stockAddPackCostLabel"),t=document.getElementById("stockAddThreshold");
+  l.firstChild.textContent=method==="weight"?"الكمية الموجودة / المضافة بالكيلو غرام":method==="piece"?"الكمية الموجودة / المضافة بالقطعة":"عدد الكارتونات / الباكيتات الموجودة";
+  s.style.display=method==="package"?"block":"none";
+  c.firstChild.textContent=method==="weight"?"سعر شراء الكيلو الواحد (د.ع)":method==="piece"?"سعر شراء القطعة الواحدة (د.ع)":"سعر شراء الكرتون / الباكيت بالكامل (د.ع)";
+  t.step=method==="weight"?".001":".001";
+  let tl=t.parentElement?.firstChild;if(tl)tl.textContent=method==="weight"?"حد تنبيه المخزون بالكيلو غرام":method==="piece"?"حد تنبيه المخزون بالقطعة":"حد تنبيه المخزون بالوحدة";
+  updateStockAddPreview();
+}
+function updateStockAddPreview(){
+  let ci=+document.getElementById("stockAddCat").value,method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("stockAddPacks").value||0,size=+document.getElementById("stockAddPackSize").value||1,cost=+document.getElementById("stockAddPackCost").value||0,sale=+document.getElementById("stockAddUnitPrice").value||0,qty=method==="package"?packs*size:packs,unitCost=method==="package"?cost/size:cost;
+  document.getElementById("stockAddPreviewQty").textContent=(Number.isFinite(qty)?qty:0).toLocaleString("en-US")+" "+(method==="weight"?"كغم":"قطعة");
+  document.getElementById("stockAddPreviewCost").textContent=fmt(unitCost);
+  document.getElementById("stockAddUnitCost").value=fmt(unitCost);
+  document.getElementById("stockAddPreviewProfit").textContent=fmt(sale-unitCost);
+}
+function saveStockAddProduct(){
+  let ci=+document.getElementById("stockAddCat").value,val=document.getElementById("stockAddProd").value,isNew=val==="new",name=isNew?document.getElementById("stockAddNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("stockAddPacks").value,size=method==="package"?(+document.getElementById("stockAddPackSize").value||0):1,packCost=+document.getElementById("stockAddPackCost").value,sale=+document.getElementById("stockAddUnitPrice").value,threshold=+document.getElementById("stockAddThreshold").value||0;
+  if(isNew&&!name)return alert("اكتب اسم المنتج الجديد");
+  if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(sale)||sale<0)return alert("تحقق من الكمية والأسعار");
+  if(method==="package"&&(!Number.isFinite(size)||size<=0))return alert("أدخل عدد الوحدات داخل الكرتون / الباكيت");
+  let qty=+(method==="package"?packs*size:packs).toFixed(3),unitCost=method==="package"?packCost/size:packCost;
+  if(isNew){
+    p={name,price:sale,cost:unitCost,stock:qty,unit:method==="weight"?"kg":"piece",alertThreshold,categoryType:method,packSize:method==="package"?size:1,packCost,lastPurchaseUnitCost:unitCost,stockUnit:method==="weight"?"kg":"piece"};
+    cats[ci].products.push(p);
+  }else{
+    p.stock=+(Number(p.stock||0)+qty).toFixed(3);p.price=sale;p.cost=unitCost;p.alertThreshold=threshold;p.unit=method==="weight"?"kg":"piece";p.categoryType=method;p.packSize=method==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;p.stockUnit=p.unit;
+  }
+  save();closeModal();stockPage();alert("تمت إضافة "+qty+" "+(method==="weight"?"كغم":"وحدة")+" من "+p.name+" إلى المخزون مباشرة.");
+}
+function stockFilterView(mode){let rows=cats.flatMap(c=>c.products.filter(p=>mode==="out"?p.stock<=0:p.stock>0&&p.stock<5).map(p=>({cat:c.name,p}))),el=document.getElementById("catalog");document.getElementById("heading").textContent=mode==="out"?"المنتجات غير المتوفرة":"المنتجات قليلة المخزون";document.getElementById("hint").textContent=mode==="out"?"المنتجات التي نفد مخزونها":"المنتجات التي بقي منها أقل من 5 وحدات";document.getElementById("back").style.display="inline-block";document.getElementById("back").onclick=stockPage;el.className="";el.innerHTML=`<div class="actions">
 <button class="gray" onclick="stockPage()">العودة إلى المخزون</button>
 </div>
 <div class="tablewrap">
