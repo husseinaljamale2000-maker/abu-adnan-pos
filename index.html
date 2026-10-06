@@ -151,6 +151,17 @@ function ensureExtraSections(){
   });
 }
 ensureExtraSections();
+function ensureRequiredSections(){
+  cats=Array.isArray(cats)?cats:[];
+  cats=cats.filter(c=>c && c.name!=="الخضروات والفواكه");
+  ensureWeightCategory();
+  ensureExtraSections();
+  let canned=cats.find(c=>c.name==="المعلبات");
+  if(canned)canned.purchaseMethod="package";
+  normalizeCategoryMethods();
+  localStorage.setItem("posBlank40Cats",JSON.stringify(cats));
+}
+ensureRequiredSections();
 localStorage.setItem("posBlank40Cats",JSON.stringify(cats));
 let cannedCat=cats.find(c=>c.name==="المعلبات");
 if(cannedCat)cannedCat.purchaseMethod="package";
@@ -203,7 +214,7 @@ const DATA_RESET_VERSION="abuAdnanFreshStartV1";
 function resetBusinessData(){cats=cats.map(c=>({...c,products:[]}));sales=[];purchases=[];closedDays=[];debts=[];activeSalesDay=null;purchaseDraftInvoiceNo=null;localStorage.setItem("posBlank40Cats",JSON.stringify(cats));localStorage.setItem("posBlank40Sales","[]");localStorage.setItem("posBlank40Purchases","[]");localStorage.setItem("posBlank40ClosedDays","[]");localStorage.setItem("posBlank40Debts","[]");localStorage.removeItem("posBlank40ActiveSalesDay");localStorage.removeItem("posBlank40PurchaseDraftInvoiceNo");if(typeof resetHistory==="function")resetHistory()}
 function localSnapshot(){return {version:1,__freshStartVersion:DATA_RESET_VERSION,categories:cats,sales,purchases,closedDays,debts,activeSalesDay,purchaseDraftInvoiceNo,sectionPassword:localStorage.getItem("posBlank40SectionPass")||"",exportedAt:new Date().toISOString()}}
 async function cloudPush(){if(!confirm("سيتم رفع بيانات هذا الجهاز إلى الحساب السحابي. إذا كانت هناك بيانات سحابية سابقة فسيتم استبدالها. أنشئ نسخة احتياطية وتأكد أن هذه هي البيانات التي تريد اعتمادها. هل تريد المتابعة؟"))return;cloudMessage("جارٍ رفع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId"),uid=localStorage.getItem("posBlank40CloudUid");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=id&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId),r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة الجدول");let stamp=new Date().toISOString(),body={shop_id:shopId,entity_type:"app_state",entity_id:shopId,payload:localSnapshot(),updated_at:stamp,updated_by:uid};if(rows.length){r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync?id=eq."+encodeURIComponent(rows[0].id),{method:"PATCH",headers:{...cloudHeaders(token),"Prefer":"return=minimal"},body:JSON.stringify(body)})}else{r=await fetch(SUPABASE_URL+"/rest/v1/cashier_sync",{method:"POST",headers:{...cloudHeaders(token),"Prefer":"return=minimal"},body:JSON.stringify(body)})}if(!r.ok){let e=await r.json();throw Error(e.message||e.details||"تعذر حفظ البيانات. تحقق من سياسات RLS")};window.lastCloudStamp=stamp;localStorage.setItem("posBlank40CloudStamp",stamp);clearOfflinePending();window.offlineSessionActive=false;cloudMessage("تم رفع البيانات إلى السحابة بنجاح.");alert("تم رفع بيانات الكاشير بنجاح")}catch(e){cloudMessage("فشل رفع البيانات: "+e.message,true);alert("فشل رفع البيانات: "+e.message)}}
-async function cloudPull(){if(!confirm("سيتم استبدال بيانات هذا الجهاز بالبيانات الموجودة في السحابة. يُفضّل تصدير نسخة احتياطية أولاً. هل تريد المتابعة؟"))return;cloudMessage("جارٍ استرجاع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=payload,updated_at&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId)+"&limit=1",r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة البيانات");if(!rows.length)throw Error("لا توجد نسخة سحابية لهذا المتجر.");let d=rows[0].payload;if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;ensureWeightCategory();purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();window.lastCloudStamp=rows[0].updated_at||"";if(window.lastCloudStamp)localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp);clearOfflinePending();window.offlineSessionActive=false;page("sale");showCats();renderCart();cloudMessage("تم استرجاع البيانات السحابية بنجاح.");alert("تم استرجاع بيانات المتجر بنجاح")}catch(e){cloudMessage("فشل الاسترجاع: "+e.message,true);alert("فشل استرجاع البيانات: "+e.message)}}
+async function cloudPull(){if(!confirm("سيتم استبدال بيانات هذا الجهاز بالبيانات الموجودة في السحابة. يُفضّل تصدير نسخة احتياطية أولاً. هل تريد المتابعة؟"))return;cloudMessage("جارٍ استرجاع البيانات...");try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}let q=SUPABASE_URL+"/rest/v1/cashier_sync?select=payload,updated_at&entity_type=eq.app_state&shop_id=eq."+encodeURIComponent(shopId)+"&limit=1",r=await fetch(q,{headers:cloudHeaders(token)}),rows=await r.json();if(!r.ok)throw Error(rows.message||"تعذر قراءة البيانات");if(!rows.length)throw Error("لا توجد نسخة سحابية لهذا المتجر.");let d=rows[0].payload;if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;ensureRequiredSections();purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();window.lastCloudStamp=rows[0].updated_at||"";if(window.lastCloudStamp)localStorage.setItem("posBlank40CloudStamp",window.lastCloudStamp);clearOfflinePending();window.offlineSessionActive=false;page("sale");showCats();renderCart();cloudMessage("تم استرجاع البيانات السحابية بنجاح.");alert("تم استرجاع بيانات المتجر بنجاح")}catch(e){cloudMessage("فشل الاسترجاع: "+e.message,true);alert("فشل استرجاع البيانات: "+e.message)}}
 let autoPushTimer=null,autoPullTimer=null;
 window.autoSyncReady=false;window.applyingCloud=false;window.autoSyncBusy=false;
 window.offlineSessionActive=false;
@@ -256,7 +267,7 @@ async function syncOfflinePendingChanges(token,shopId,uid){
   window.offlineSessionActive=false;
   return true;
 }
-function applyCloudState(d){if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;ensureWeightCategory();purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();page(current);renderCart()}
+function applyCloudState(d){if(!d||!Array.isArray(d.categories)||!Array.isArray(d.sales))throw Error("صيغة البيانات السحابية غير متوقعة");window.applyingCloud=true;cats=d.categories;sales=d.sales;ensureRequiredSections();purchases=Array.isArray(d.purchases)?d.purchases:[];closedDays=Array.isArray(d.closedDays)?d.closedDays:[];debts=Array.isArray(d.debts)?d.debts:[];activeSalesDay=d.activeSalesDay||null;purchaseDraftInvoiceNo=d.purchaseDraftInvoiceNo||null;if(typeof d.sectionPassword==="string"&&d.sectionPassword)localStorage.setItem("posBlank40SectionPass",d.sectionPassword);save();window.applyingCloud=false;resetHistory();page(current);renderCart()}
 function queueAutoPush(){if(!window.autoSyncReady||window.autoSyncBusy)return;clearTimeout(autoPushTimer);autoPushTimer=setTimeout(async()=>{autoPushTimer=null;if(!window.autoSyncReady)return;window.autoSyncBusy=true;try{let token=await cloudToken(),shopId=localStorage.getItem("posBlank40ShopId"),uid=localStorage.getItem("posBlank40CloudUid");if(!shopId){let c=await getShopContext(token);shopId=c.shop_id}await writeCloudState(token,shopId,uid);clearOfflinePending();cloudMessage("☁️ تمت المزامنة التلقائية",false)}catch(e){if(e.message==="CONFLICT"){markOfflinePending();cloudMessage("يوجد تعديل من جهاز آخر؛ أوقفنا الرفع لحماية البيانات. لم نفقد تعديلات هذا الجهاز.",true)}else{markOfflinePending();cloudMessage("تعذرت المزامنة، وتم حفظ التعديل محلياً حتى عودة الاتصال: "+e.message,true)}}finally{window.autoSyncBusy=false}},1200)}
 async function initializeAutoSync(){
   if(!localStorage.getItem("posBlank40CloudAccess"))throw Error("سجّل الدخول أولاً");
@@ -835,13 +846,14 @@ let stockActive=-1;function stockBack(){if(current!=="stock"){showCats();return}
 </div>`}function openStockAddProduct(){
   document.getElementById("modalTitle").textContent="➕ إضافة منتجات مباشرة إلى المخزون";
   document.getElementById("modalBody").innerHTML=`
-  <p class="muted">هذه العملية تضيف الكمية مباشرة إلى المخزون ولا تُسجَّل كفاتورة شراء.</p>
+  <p class="muted">أدخل بيانات المادة. إذا أدخلت «الكمية الموجودة حالياً» يعتمدها البرنامج كمخزون فعلي، وإذا تركتها فارغة يضيف الكمية المحسوبة إلى المخزون الحالي.</p>
   <div class="fields">
     <label>القسم الرئيسي<select id="stockAddCat" onchange="stockAddCategoryChanged()">${cats.map((c,i)=>`<option value="${i}">${c.name} — ${purchaseMethodLabel(c)}</option>`).join("")}</select></label>
     <label>المنتج<select id="stockAddProd" onchange="stockAddProductChanged()"></select></label>
     <label id="stockAddNewNameLabel" style="display:none">اسم المنتج الجديد<input id="stockAddNewName" placeholder="اسم المنتج"></label>
-    <label id="stockAddPacksLabel">الكمية الموجودة / المضافة<input id="stockAddPacks" type="number" min=".001" step=".001" value="1"></label>
+    <label id="stockAddPacksLabel">عدد الكارتونات / الباكيتات<input id="stockAddPacks" type="number" min=".001" step=".001" value="1"></label>
     <label id="stockAddPackSizeLabel">عدد العلب / الوحدات داخل الكرتون أو الباكيت<input id="stockAddPackSize" type="number" min=".001" step=".001" value="1"></label>
+    <label id="stockAddCurrentQtyLabel">العلب / الوحدات الموجودة حالياً (اختياري)<input id="stockAddCurrentQty" type="number" min="0" step=".001" placeholder="اتركها فارغة ليحسبها تلقائياً"></label>
     <label id="stockAddPackCostLabel">سعر شراء الكرتون / الباكيت بالكامل (د.ع)<input id="stockAddPackCost" type="number" min="0" value="0"></label>
     <label>سعر شراء الوحدة الواحدة (يُحسب تلقائياً)<input id="stockAddUnitCost" type="text" readonly value="0 د.ع"></label>
     <label>سعر بيع الوحدة الواحدة (د.ع)<input id="stockAddUnitPrice" type="number" min="0" value="0"></label>
@@ -849,14 +861,14 @@ let stockActive=-1;function stockBack(){if(current!=="stock"){showCats();return}
     <label>حد تنبيه المخزون<input id="stockAddThreshold" type="number" min="0" step=".001" value="0"></label>
   </div>
   <div class="cards" style="margin-top:12px">
-    <div class="stat"><span>الكمية التي ستضاف للمخزون</span><b id="stockAddPreviewQty">0</b></div>
+    <div class="stat"><span>الكمية التي ستُعتمد بالمخزون</span><b id="stockAddPreviewQty">0</b></div>
     <div class="stat"><span>تكلفة الوحدة</span><b id="stockAddPreviewCost">0 د.ع</b></div>
     <div class="stat"><span>الربح المتوقع للوحدة</span><b id="stockAddPreviewProfit">0 د.ع</b></div>
   </div>
   <div class="actions"><button class="green" onclick="saveStockAddProduct()">💾 إضافة للمخزون</button><button class="gray" onclick="closeModal()">إلغاء</button></div>`;
   openModal();
   stockAddCategoryChanged();
-  ["stockAddPacks","stockAddPackSize","stockAddPackCost","stockAddUnitPrice"].forEach(id=>document.getElementById(id)?.addEventListener("input",updateStockAddPreview));
+  ["stockAddPacks","stockAddPackSize","stockAddCurrentQty","stockAddPackCost","stockAddUnitPrice"].forEach(id=>document.getElementById(id)?.addEventListener("input",updateStockAddPreview));
 }
 function stockAddCategoryChanged(){
   let ci=+document.getElementById("stockAddCat").value,sel=document.getElementById("stockAddProd");
@@ -868,39 +880,44 @@ function stockAddProductChanged(){
   document.getElementById("stockAddNewNameLabel").style.display=isNew?"block":"none";
   document.getElementById("stockAddNewName").value="";
   document.getElementById("stockAddUnit").value=purchaseMethodLabel(cats[ci]);
-  document.getElementById("stockAddPacks").value="";
+  document.getElementById("stockAddPacks").value=isNew?"":"1";
   document.getElementById("stockAddPackSize").value=method==="package"?(p?.packSize||1):1;
+  document.getElementById("stockAddCurrentQty").value="";
   document.getElementById("stockAddPackCost").value=p?(method==="package"?((p.cost||0)*(p.packSize||1)):(p.cost||0)):0;
   document.getElementById("stockAddUnitPrice").value=p?(p.price||0):0;
   document.getElementById("stockAddThreshold").value=p?(p.alertThreshold??0):0;
-  let l=document.getElementById("stockAddPacksLabel"),s=document.getElementById("stockAddPackSizeLabel"),c=document.getElementById("stockAddPackCostLabel"),t=document.getElementById("stockAddThreshold");
-  l.firstChild.textContent=method==="weight"?"الكمية الموجودة / المضافة بالكيلو غرام":method==="piece"?"الكمية الموجودة / المضافة بالقطعة":"عدد الكارتونات / الباكيتات الموجودة";
+  let l=document.getElementById("stockAddPacksLabel"),s=document.getElementById("stockAddPackSizeLabel"),q=document.getElementById("stockAddCurrentQtyLabel"),c=document.getElementById("stockAddPackCostLabel"),t=document.getElementById("stockAddThreshold");
+  l.firstChild.textContent=method==="weight"?"عدد الكيلوات":method==="piece"?"عدد القطع":"عدد الكارتونات / الباكيتات";
   s.style.display=method==="package"?"block":"none";
+  q.style.display="block";
+  q.firstChild.textContent=method==="weight"?"الكمية الموجودة حالياً بالكيلو غرام (اختياري)":method==="piece"?"الكمية الموجودة حالياً بالقطعة (اختياري)":"عدد العلب / الوحدات الموجودة حالياً (اختياري)";
   c.firstChild.textContent=method==="weight"?"سعر شراء الكيلو الواحد (د.ع)":method==="piece"?"سعر شراء القطعة الواحدة (د.ع)":"سعر شراء الكرتون / الباكيت بالكامل (د.ع)";
-  t.step=method==="weight"?".001":".001";
+  t.step=".001";
   let tl=t.parentElement?.firstChild;if(tl)tl.textContent=method==="weight"?"حد تنبيه المخزون بالكيلو غرام":method==="piece"?"حد تنبيه المخزون بالقطعة":"حد تنبيه المخزون بالوحدة";
   updateStockAddPreview();
 }
 function updateStockAddPreview(){
-  let ci=+document.getElementById("stockAddCat").value,method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("stockAddPacks").value||0,size=+document.getElementById("stockAddPackSize").value||1,cost=+document.getElementById("stockAddPackCost").value||0,sale=+document.getElementById("stockAddUnitPrice").value||0,qty=method==="package"?packs*size:packs,unitCost=method==="package"?cost/size:cost;
+  let ci=+document.getElementById("stockAddCat").value,method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("stockAddPacks").value||0,size=+document.getElementById("stockAddPackSize").value||1,cost=+document.getElementById("stockAddPackCost").value||0,sale=+document.getElementById("stockAddUnitPrice").value||0,currentRaw=document.getElementById("stockAddCurrentQty").value.trim(),calculated=method==="package"?packs*size:packs,qty=currentRaw===""?calculated:+currentRaw,unitCost=method==="package"?cost/size:cost;
   document.getElementById("stockAddPreviewQty").textContent=(Number.isFinite(qty)?qty:0).toLocaleString("en-US")+" "+(method==="weight"?"كغم":"قطعة");
   document.getElementById("stockAddPreviewCost").textContent=fmt(unitCost);
   document.getElementById("stockAddUnitCost").value=fmt(unitCost);
   document.getElementById("stockAddPreviewProfit").textContent=fmt(sale-unitCost);
 }
 function saveStockAddProduct(){
-  let ci=+document.getElementById("stockAddCat").value,val=document.getElementById("stockAddProd").value,isNew=val==="new",name=isNew?document.getElementById("stockAddNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("stockAddPacks").value,size=method==="package"?(+document.getElementById("stockAddPackSize").value||0):1,packCost=+document.getElementById("stockAddPackCost").value,sale=+document.getElementById("stockAddUnitPrice").value,threshold=+document.getElementById("stockAddThreshold").value||0;
+  let ci=+document.getElementById("stockAddCat").value,val=document.getElementById("stockAddProd").value,isNew=val==="new",name=isNew?document.getElementById("stockAddNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("stockAddPacks").value,size=method==="package"?(+document.getElementById("stockAddPackSize").value||0):1,packCost=+document.getElementById("stockAddPackCost").value,sale=+document.getElementById("stockAddUnitPrice").value,threshold=+document.getElementById("stockAddThreshold").value||0,currentRaw=document.getElementById("stockAddCurrentQty").value.trim();
   if(isNew&&!name)return alert("اكتب اسم المنتج الجديد");
-  if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(sale)||sale<0)return alert("تحقق من الكمية والأسعار");
+  if(!Number.isFinite(packs)||packs<0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(sale)||sale<0)return alert("تحقق من الكمية والأسعار");
   if(method==="package"&&(!Number.isFinite(size)||size<=0))return alert("أدخل عدد الوحدات داخل الكرتون / الباكيت");
   let qty=+(method==="package"?packs*size:packs).toFixed(3),unitCost=method==="package"?packCost/size:packCost;
+  let actualStock=currentRaw===""?((p?Number(p.stock||0):0)+qty):+Number(currentRaw).toFixed(3);
+  if(currentRaw!==""&&(!Number.isFinite(actualStock)||actualStock<0))return alert("الكمية الموجودة حالياً غير صحيحة");
   if(isNew){
-    p={name,price:sale,cost:unitCost,stock:qty,unit:method==="weight"?"kg":"piece",alertThreshold,categoryType:method,packSize:method==="package"?size:1,packCost,lastPurchaseUnitCost:unitCost,stockUnit:method==="weight"?"kg":"piece"};
+    p={name,price:sale,cost:unitCost,stock:actualStock,unit:method==="weight"?"kg":"piece",alertThreshold,categoryType:method,packSize:method==="package"?size:1,packCost,lastPurchaseUnitCost:unitCost,stockUnit:method==="weight"?"kg":"piece"};
     cats[ci].products.push(p);
   }else{
-    p.stock=+(Number(p.stock||0)+qty).toFixed(3);p.price=sale;p.cost=unitCost;p.alertThreshold=threshold;p.unit=method==="weight"?"kg":"piece";p.categoryType=method;p.packSize=method==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;p.stockUnit=p.unit;
+    p.stock=actualStock;p.price=sale;p.cost=unitCost;p.alertThreshold=threshold;p.unit=method==="weight"?"kg":"piece";p.categoryType=method;p.packSize=method==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;p.stockUnit=p.unit;
   }
-  save();closeModal();stockPage();alert("تمت إضافة "+qty+" "+(method==="weight"?"كغم":"وحدة")+" من "+p.name+" إلى المخزون مباشرة.");
+  save();closeModal();stockPage();alert("تم تحديث مخزون "+p.name+" بنجاح.");
 }
 function stockFilterView(mode){let rows=cats.flatMap(c=>c.products.filter(p=>mode==="out"?p.stock<=0:p.stock>0&&p.stock<5).map(p=>({cat:c.name,p}))),el=document.getElementById("catalog");document.getElementById("heading").textContent=mode==="out"?"المنتجات غير المتوفرة":"المنتجات قليلة المخزون";document.getElementById("hint").textContent=mode==="out"?"المنتجات التي نفد مخزونها":"المنتجات التي بقي منها أقل من 5 وحدات";document.getElementById("back").style.display="inline-block";document.getElementById("back").onclick=stockPage;el.className="";el.innerHTML=`<div class="actions">
 <button class="gray" onclick="stockPage()">العودة إلى المخزون</button>
