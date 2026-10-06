@@ -681,8 +681,11 @@ function nextSalesSessionKey(date=todayKey()){
 }
 function ensureActiveSalesSession(){
   let date=todayKey();
+  // إذا كان هناك حساب حالي محفوظ لهذا اليوم، لا نعيد إنشاءه بسبب وجود حسابات مغلقة أخرى.
   if(activeSalesDay&&salesSessionDate(activeSalesDay)===date)return activeSalesDay;
+  // أنشئ أول حساب لليوم، وبعد الإغلاق استخدم الرقم التالي.
   activeSalesDay=closedDays.some(d=>salesSessionDate(d.dayKey)===date)?nextSalesSessionKey(date):date;
+  localStorage.setItem("posBlank40ActiveSalesDay",activeSalesDay);
   return activeSalesDay;
 }
 function pay(method){if(!cart.length)return alert("الفاتورة فارغة");let debtor="";if(method==="دين"){debtor=prompt("أدخل اسم الشخص المدين:");if(debtor===null)return;debtor=debtor.trim();if(!debtor)return alert("اسم الشخص مطلوب لتسجيل الدين")}for(let x of cart){let p=cats[x.ci].products[x.pi];if(p.stock<x.qty&&!confirm(`المتوفر من ${p.name} هو ${p.stock} فقط. هل تريد إكمال البيع ويصبح المخزون سالباً؟`))return}let sub=cart.reduce((s,p)=>s+p.price*p.qty,0),discount=Math.max(0,+document.getElementById("discount").value||0),total=Math.max(0,sub-discount),profit=cart.reduce((s,x)=>s+(x.price-x.cost)*x.qty,0)-discount,id=Date.now(),date=new Date().toLocaleString("ar-IQ"),sessionKey=ensureActiveSalesSession();cart.forEach(x=>cats[x.ci].products[x.pi].stock-=x.qty);sales.unshift({id,dayKey:sessionKey,date,method,debtor:method==="دين"?debtor:"",items:cart.map(x=>({...x})),subtotal:sub,discount,total,profit});if(method==="دين")debts.unshift({id,debtor,amount:total,paid:0,date,invoiceId:id});save();alert((method==="دين"?"تم تسجيل الدين باسم "+debtor+"\n":"تم تسجيل الفاتورة\n")+"الإجمالي: "+fmt(total)+"\nالربح التقديري: "+fmt(profit));clearCart();if(current==="sale")showCats()}
@@ -933,7 +936,7 @@ function saveStockAddProduct(){
   let actualStock=isNew?(currentRaw===""?qty:+Number(currentRaw).toFixed(3)):+(Number(p?.stock||0)+qty).toFixed(3);
   if(isNew&&currentRaw!==""&&(!Number.isFinite(actualStock)||actualStock<0))return alert("الكمية الموجودة حالياً غير صحيحة");
   if(isNew){
-    p={name,price:sale,cost:unitCost,stock:actualStock,unit:method==="weight"?"kg":"piece",alertThreshold,categoryType:method,packSize:method==="package"?size:1,packCost,lastPurchaseUnitCost:unitCost,stockUnit:method==="weight"?"kg":"piece"};
+    p={name,price:sale,cost:unitCost,stock:actualStock,unit:method==="weight"?"kg":"piece",alertThreshold:threshold,categoryType:method,packSize:method==="package"?size:1,packCost,lastPurchaseUnitCost:unitCost,stockUnit:method==="weight"?"kg":"piece"};
     cats[ci].products.push(p);
   }else{
     p.stock=actualStock;p.price=sale;p.cost=unitCost;p.alertThreshold=threshold;p.unit=method==="weight"?"kg":"piece";p.categoryType=method;p.packSize=method==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;p.stockUnit=p.unit;
@@ -1163,120 +1166,160 @@ function clearPurchaseForm(){
 function closeSalesDay(){
   let key=ensureActiveSalesSession(),daySales=sales.filter(x=>x.dayKey===key);if(!daySales.length)return alert("لا توجد فواتير في الحساب الحالي حتى يتم إغلاقه");
   if(closedDays.some(x=>x.dayKey===key))return alert("تم إغلاق هذا الحساب مسبقاً");
-  let revenue=daySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.total,0),profit=daySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.profit,0);
+  let normalRows=daySales.filter(x=>!x.debtCollection&&!x.manualAdd),
+      revenue=normalRows.reduce((a,x)=>a+Number(x.total||0),0),
+      profit=normalRows.reduce((a,x)=>a+Number(x.profit||0),0),
+      debtCollected=daySales.filter(x=>x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0),
+      manualAdded=daySales.filter(x=>x.manualAdd).reduce((a,x)=>a+Number(x.total||0),0);
   if(!confirm("سيتم إغلاق الحساب الحالي وحفظ "+daySales.length+" فاتورة. بعدها ستظهر حسابات جديدة بصفر. هل تريد المتابعة؟"))return;
-  closedDays.push({dayKey:key,dateKey:salesSessionDate(key),sessionNo:salesSessionNumber(key),count:daySales.length,revenue,profit,invoiceIds:daySales.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")});
+  closedDays.push({dayKey:key,dateKey:salesSessionDate(key),sessionNo:salesSessionNumber(key),count:daySales.length,revenue,profit,debtCollected,manualAdded,invoiceIds:daySales.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")});
   activeSalesDay=nextSalesSessionKey(salesSessionDate(key));save();salesPage();alert("تم إغلاق الحساب بنجاح. تم فتح حساب جديد برصيد صفر.");
 }
 function reopenSalesDay(key){
   const targetKey=String(key||"");
   if(!targetKey)return alert("رقم الحساب غير صحيح");
+  let d=closedDays.find(x=>String(x.dayKey)===targetKey);
+  let targetRows=sales.filter(x=>String(x.dayKey)===targetKey);
+  if(!d && !targetRows.length)return alert("لم يتم العثور على هذا الحساب المغلق.");
 
-  const targetRows=sales.filter(x=>String(x.dayKey)===targetKey);
-  if(!targetRows.length){
-    return alert("لم يتم العثور على عمليات هذا الحساب.");
+  if(!d){
+    const normalRows=targetRows.filter(x=>!x.debtCollection&&!x.manualAdd);
+    d={
+      dayKey:targetKey,dateKey:salesSessionDate(targetKey),sessionNo:salesSessionNumber(targetKey),
+      count:targetRows.length,
+      revenue:normalRows.reduce((a,x)=>a+Number(x.total||0),0),
+      profit:normalRows.reduce((a,x)=>a+Number(x.profit||0),0),
+      debtCollected:targetRows.filter(x=>x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0),
+      manualAdded:targetRows.filter(x=>x.manualAdd).reduce((a,x)=>a+Number(x.total||0),0),
+      invoiceIds:targetRows.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")
+    };
+    closedDays.push(d);
   }
 
   const currentKey=activeSalesDay?String(activeSalesDay):"";
+  const activeRows=currentKey?sales.filter(x=>String(x.dayKey)===currentKey):[];
+
   if(currentKey===targetKey){
     closedDays=closedDays.filter(x=>String(x.dayKey)!==targetKey);
-    save();
-    closeModal();
-    salesPage();
-    alert("هذا الحساب مفتوح بالفعل.");
+    save(); closeModal(); salesPage();
+    alert("الحساب مفتوح بالفعل ويمكنك إضافة فواتير جديدة عليه.");
     return;
   }
 
-  const currentRows=currentKey?sales.filter(x=>String(x.dayKey)===currentKey):[];
-
-  if(!confirm("إعادة فتح الحساب رقم "+salesSessionNumber(targetKey)+" بتاريخ "+salesSessionDate(targetKey)+"؟\n\nسيصبح هذا الحساب هو الحساب الحالي ويمكنك إضافة فواتير جديدة عليه."))return;
-
-  // احتفظ بالحساب الحالي كسجل مغلق حتى لا تضيع عملياته.
-  if(currentKey && currentRows.length){
-    const currentRevenue=currentRows.filter(x=>!x.manualAdd&&!x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0);
-    const currentProfit=currentRows.filter(x=>!x.manualAdd&&!x.debtCollection).reduce((a,x)=>a+Number(x.profit||0),0);
-    const currentRecord={
-      dayKey:currentKey,
-      dateKey:salesSessionDate(currentKey),
-      sessionNo:salesSessionNumber(currentKey),
-      count:currentRows.length,
-      revenue:currentRevenue,
-      profit:currentProfit,
-      invoiceIds:currentRows.map(x=>x.id),
-      closedAt:new Date().toLocaleString("ar-IQ")
-    };
-    closedDays=closedDays.filter(x=>String(x.dayKey)!==currentKey);
-    closedDays.push(currentRecord);
+  if(activeRows.length){
+    if(!confirm("الحساب الحالي يحتوي على "+activeRows.length+" عملية.\nسيتم حفظه كحساب مستقل، ثم إعادة فتح الحساب الذي اخترته.\nهل تريد المتابعة؟"))return;
+    if(!closedDays.some(x=>String(x.dayKey)===currentKey)){
+      const normalRows=activeRows.filter(x=>!x.debtCollection&&!x.manualAdd);
+      closedDays.push({
+        dayKey:currentKey,dateKey:salesSessionDate(currentKey),sessionNo:salesSessionNumber(currentKey),
+        count:activeRows.length,
+        revenue:normalRows.reduce((a,x)=>a+Number(x.total||0),0),
+        profit:normalRows.reduce((a,x)=>a+Number(x.profit||0),0),
+        debtCollected:activeRows.filter(x=>x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0),
+        manualAdded:activeRows.filter(x=>x.manualAdd).reduce((a,x)=>a+Number(x.total||0),0),
+        invoiceIds:activeRows.map(x=>x.id),closedAt:new Date().toLocaleString("ar-IQ")
+      });
+    }
   }
 
-  // إزالة الحساب الهدف من المغلقين وتحويله فعليًا إلى الحساب الحالي.
+  if(!confirm("إعادة فتح الحساب رقم "+salesSessionNumber(targetKey)+" بتاريخ "+salesSessionDate(targetKey)+"؟\n\nسيصبح هذا الحساب هو الحساب الحالي، ويمكنك إضافة فواتير جديدة عليه."))return;
+
   closedDays=closedDays.filter(x=>String(x.dayKey)!==targetKey);
   activeSalesDay=targetKey;
+  localStorage.setItem("posBlank40ActiveSalesDay",targetKey);
   save();
+  activeSalesDay=targetKey;
+  localStorage.setItem("posBlank40ActiveSalesDay",targetKey);
   closeModal();
   salesPage();
-  alert("تمت إعادة فتح الحساب بنجاح. يمكنك الآن إضافة فواتير جديدة عليه.");
+  alert("تمت إعادة فتح الحساب رقم "+salesSessionNumber(targetKey)+" بنجاح. يمكنك الآن إضافة فواتير جديدة عليه.");
 }
 function showClosedDay(key){
-  let d=closedDays.find(x=>x.dayKey===key);if(!d)return;let ids=Array.isArray(d.invoiceIds)?d.invoiceIds:[],rows=ids.length?sales.filter(x=>ids.includes(x.id)):sales.filter(x=>x.dayKey===key);
+  let d=closedDays.find(x=>String(x.dayKey)===String(key));if(!d)return;
+  let ids=Array.isArray(d.invoiceIds)?d.invoiceIds:[],
+      rows=ids.length?sales.filter(x=>ids.includes(x.id)):sales.filter(x=>String(x.dayKey)===String(key));
+  const normalRows=rows.filter(x=>!x.debtCollection&&!x.manualAdd);
+  const salesTotal=normalRows.reduce((a,x)=>a+Number(x.total||0),0);
+  const debtCollected=rows.filter(x=>x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0);
+  const manualAdded=rows.filter(x=>x.manualAdd).reduce((a,x)=>a+Number(x.total||0),0);
+  const cash=normalRows.filter(x=>x.method==="نقداً").reduce((a,x)=>a+Number(x.total||0),0);
+  const card=normalRows.filter(x=>x.method==="بطاقة").reduce((a,x)=>a+Number(x.total||0),0);
+  const credit=normalRows.filter(x=>x.method==="دين").reduce((a,x)=>a+Number(x.total||0),0);
+  const received=cash+card+debtCollected+manualAdded;
   document.getElementById("modalTitle").textContent="ملخص الحساب المغلق — "+salesSessionDate(key);
-  document.getElementById("modalBody").innerHTML=`<div class="cards"><div class="stat"><span>رقم الجلسة</span><b>${salesSessionNumber(key)}</b></div><div class="stat"><span>عدد الفواتير</span><b>${d.count}</b></div><div class="stat"><span>إجمالي المبيعات</span><b>${fmt(d.revenue)}</b></div><div class="stat"><span>إجمالي الأرباح</span><b>${fmt(d.profit)}</b></div></div><div class="actions"><button class="blue" onclick="reopenSalesDay('${String(key).replace(/'/g,"\\'")}')">🔓 إعادة فتح هذا الحساب</button></div><h3>تفاصيل الفواتير والمنتجات المباعة</h3>${rows.map((x,i)=>`<div class="tablewrap" style="margin:12px 0;padding:8px"><h4 style="padding:8px">الفاتورة رقم ${i+1} — ${x.date||salesSessionDate(key)}</h4><table><thead><tr><th>المنتج</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead><tbody>${(Array.isArray(x.items)?x.items:[]).map(it=>`<tr><td>${it.name||"منتج"}</td><td>${it.qty??0}</td><td>${fmt(it.price||0)}</td><td>${fmt((it.price||0)*(it.qty||0))}</td></tr>`).join("")||'<tr><td colspan="4">تفاصيل المنتجات غير محفوظة لهذه الفاتورة القديمة</td></tr>'}</tbody><tfoot><tr><th colspan="3">إجمالي الفاتورة</th><th>${fmt(x.total||0)}</th></tr><tr><th colspan="3">الربح</th><th>${fmt(x.profit||0)}</th></tr></tfoot></table></div>`).join("")||'<p>لا توجد تفاصيل فواتير محفوظة لهذا الحساب.</p>'}`;openModal();
+  document.getElementById("modalBody").innerHTML=`
+  <div class="cards">
+    <div class="stat"><span>رقم الحساب</span><b>${salesSessionNumber(key)}</b></div>
+    <div class="stat"><span>إجمالي المبيعات</span><b>${fmt(salesTotal)}</b></div>
+    <div class="stat"><span>المبيعات نقداً</span><b>${fmt(cash)}</b></div>
+    <div class="stat"><span>المبيعات بطاقة</span><b>${fmt(card)}</b></div>
+    <div class="stat"><span>المبيعات بالدين</span><b>${fmt(credit)}</b></div>
+    <div class="stat"><span>الديون المسددة</span><b>${fmt(debtCollected)}</b></div>
+    <div class="stat"><span>الإضافات النقدية</span><b>${fmt(manualAdded)}</b></div>
+    <div class="stat"><span>إجمالي المقبوضات</span><b>${fmt(received)}</b></div>
+    <div class="stat"><span>إجمالي الأرباح</span><b>${fmt(d.profit||0)}</b></div>
+  </div>
+  <div class="actions"><button class="blue" onclick="reopenSalesDay('${String(key).replace(/'/g,"\\'")}')">🔓 إعادة فتح هذا الحساب</button></div>
+  <h3>تفاصيل الفواتير والعمليات</h3>
+  ${rows.map((x,i)=>`<div class="tablewrap" style="margin:12px 0;padding:8px">
+    <h4 style="padding:8px">${x.debtCollection?"💵 تسديد دين":x.manualAdd?"💰 إضافة مبلغ":"🧾 الفاتورة رقم "+(i+1)} — ${x.date||salesSessionDate(key)}</h4>
+    <table><thead><tr><th>المنتج / العملية</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
+    <tbody>${(Array.isArray(x.items)?x.items:[]).map(it=>`<tr><td>${it.name||"منتج"}</td><td>${it.qty??0}</td><td>${fmt(it.price||0)}</td><td>${fmt((it.price||0)*(it.qty||0))}</td></tr>`).join("")||`<tr><td colspan="3">${x.debtCollection?"تسديد دين على "+(x.debtor||"—"):x.manualAdd?"إضافة مبلغ نقدي":"تفاصيل المنتجات غير محفوظة لهذه الفاتورة القديمة"}</td><td>${fmt(x.total||0)}</td></tr>`}</tbody>
+    <tfoot><tr><th colspan="3">الإجمالي</th><th>${fmt(x.total||0)}</th></tr><tr><th colspan="3">الربح</th><th>${fmt(x.profit||0)}</th></tr></tfoot>
+    </table>
+  </div>`).join("")||'<p>لا توجد تفاصيل محفوظة لهذا الحساب.</p>'}`;
+  openModal();
 }
 function salesPage(){
   document.getElementById("catalog").className="";
   document.getElementById("heading").textContent="سجل المبيعات والأرباح";
-  document.getElementById("hint").textContent="الفواتير والمبالغ المضافة والديون المسددة والأرباح والحسابات المغلقة";
+  document.getElementById("hint").textContent="الفواتير والمبالغ المضافة والأرباح والحسابات المغلقة";
   const key=ensureActiveSalesSession();
-  const rows=sales.filter(x=>String(x.dayKey)===String(key));
-  const invoices=rows.filter(x=>!x.manualAdd && !x.debtCollection);
-  const manual=rows.filter(x=>x.manualAdd);
-  const debtCollections=rows.filter(x=>x.debtCollection);
-  const productSales=rows.filter(x=>!x.manualAdd && !x.debtCollection);
-  const productSalesTotal=productSales.reduce((a,x)=>a+Number(x.total||0),0);
-  const manualTotal=manual.reduce((a,x)=>a+Number(x.total||0),0);
-  const debtPaidTotal=debtCollections.reduce((a,x)=>a+Number(x.total||0),0);
-  const receivedTotal=rows.reduce((a,x)=>a+Number(x.total||0),0);
-  const profit=productSales.reduce((a,x)=>a+Number(x.profit||0),0);
-
+  const rows=sales.filter(x=>x.dayKey===key);
+  const invoices=rows.filter(x=>!x.manualAdd&&!x.debtCollection);
+  const salesTotal=invoices.reduce((a,x)=>a+Number(x.total||0),0);
+  const cash=invoices.filter(x=>x.method==="نقداً").reduce((a,x)=>a+Number(x.total||0),0);
+  const card=invoices.filter(x=>x.method==="بطاقة").reduce((a,x)=>a+Number(x.total||0),0);
+  const credit=invoices.filter(x=>x.method==="دين").reduce((a,x)=>a+Number(x.total||0),0);
+  const debtCollected=rows.filter(x=>x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0);
+  const manualAdded=rows.filter(x=>x.manualAdd).reduce((a,x)=>a+Number(x.total||0),0);
+  const received=cash+card+debtCollected+manualAdded;
+  const profit=invoices.reduce((a,x)=>a+Number(x.profit||0),0);
   document.getElementById("catalog").innerHTML=`
   <div class="cards">
     <div class="stat"><span>رقم الحساب الحالي</span><b>${salesSessionNumber(key)}</b></div>
-    <div class="stat"><span>عدد فواتير البيع</span><b>${invoices.length}</b></div>
-    <div class="stat"><span>مبيعات المنتجات</span><b>${fmt(productSalesTotal)}</b></div>
-    <div class="stat"><span>الديون المسددة</span><b>${fmt(debtPaidTotal)}</b></div>
-    <div class="stat"><span>مبالغ مضافة يدويًا</span><b>${fmt(manualTotal)}</b></div>
-    <div class="stat"><span>إجمالي المبالغ المستلمة</span><b>${fmt(receivedTotal)}</b></div>
+    <div class="stat"><span>إجمالي المبيعات</span><b>${fmt(salesTotal)}</b></div>
+    <div class="stat"><span>مبيعات نقداً</span><b>${fmt(cash)}</b></div>
+    <div class="stat"><span>مبيعات بطاقة</span><b>${fmt(card)}</b></div>
+    <div class="stat"><span>مبيعات بالدين</span><b>${fmt(credit)}</b></div>
+    <div class="stat"><span>الديون المسددة</span><b>${fmt(debtCollected)}</b></div>
+    <div class="stat"><span>الإضافات النقدية</span><b>${fmt(manualAdded)}</b></div>
+    <div class="stat"><span>إجمالي المقبوضات</span><b>${fmt(received)}</b></div>
     <div class="stat"><span>إجمالي الأرباح</span><b>${fmt(profit)}</b></div>
   </div>
-  <div class="actions">
-    <button class="red" onclick="closeSalesDay()">🔒 إغلاق الحساب الحالي</button>
-  </div>
-  <div class="notice">
-    <b>توضيح الحساب:</b>
-    مبيعات المنتجات = فواتير البيع فقط،
-    الديون المسددة = مبالغ استلام ديون سابقة،
-    والمبالغ المضافة = مبالغ أضيفت يدويًا من قسم «أخرى».
-  </div>
-  <h3>الفواتير والمبالغ في الحساب الحالي</h3>
-  <div class="tablewrap"><table><thead><tr><th>النوع</th><th>التاريخ</th><th>طريقة الدفع</th><th>الشخص</th><th>الإجمالي</th><th>الربح</th></tr></thead><tbody>
+  <div class="actions"><button class="red" onclick="closeSalesDay()">🔒 إغلاق الحساب الحالي</button></div>
+  <h3>الفواتير والعمليات في الحساب الحالي</h3>
+  <div class="tablewrap"><table><thead><tr><th>النوع</th><th>التاريخ</th><th>طريقة الدفع</th><th>المبلغ</th><th>الربح</th></tr></thead><tbody>
   ${rows.map(x=>`<tr>
-    <td>${x.debtCollection?"💰 تسديد دين":x.manualAdd?"💰 إضافة مبلغ":"🧾 فاتورة بيع"}</td>
+    <td>${x.manualAdd?"💰 إضافة مبلغ":x.debtCollection?"💵 تسديد دين":"🧾 فاتورة بيع"}</td>
     <td>${x.date||"—"}</td>
-    <td>${x.debtCollection?"تسديد دين":x.manualAdd?"إضافة نقدية":(x.method||"—")}</td>
-    <td>${x.debtor||"—"}</td>
+    <td>${x.manualAdd?"إضافة نقدية":(x.method||"—")}</td>
     <td>${fmt(x.total||0)}</td>
     <td>${fmt(x.profit||0)}</td>
-  </tr>`).join("")||'<tr><td colspan="6">لا توجد عمليات في الحساب الحالي.</td></tr>'}
+  </tr>`).join("")||'<tr><td colspan="5">لا توجد عمليات في الحساب الحالي.</td></tr>'}
   </tbody></table></div>
   <h3>الحسابات المغلقة سابقاً</h3>
-  <div class="tablewrap"><table><thead><tr><th>الحساب</th><th>التاريخ</th><th>عدد العمليات</th><th>المبيعات</th><th>الديون المسددة</th><th>الأرباح</th><th>الإجراء</th></tr></thead><tbody>
-  ${closedDays.slice().reverse().map(d=>{
-    const closedRows=sales.filter(x=>String(x.dayKey)===String(d.dayKey));
-    const closedSales=closedRows.filter(x=>!x.manualAdd&&!x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0);
-    const closedDebt=closedRows.filter(x=>x.debtCollection).reduce((a,x)=>a+Number(x.total||0),0);
-    const closedProfit=closedRows.filter(x=>!x.manualAdd&&!x.debtCollection).reduce((a,x)=>a+Number(x.profit||0),0);
-    return `<tr><td>${d.sessionNo||salesSessionNumber(d.dayKey)}</td><td>${d.dateKey||salesSessionDate(d.dayKey)}</td><td>${d.count||closedRows.length||0}</td><td>${fmt(closedSales||d.revenue||0)}</td><td>${fmt(closedDebt)}</td><td>${fmt(closedProfit||d.profit||0)}</td><td><button class="blue" onclick="showClosedDay('${String(d.dayKey).replace(/'/g,"\\'")}')">عرض التفاصيل</button></td></tr>`;
-  }).join("")||'<tr><td colspan="7">لا توجد حسابات مغلقة.</td></tr>'}
+  <div class="tablewrap"><table><thead><tr><th>الحساب</th><th>التاريخ</th><th>عدد العمليات</th><th>المبيعات</th><th>الديون المسددة</th><th>الإضافات</th><th>الأرباح</th><th>الإجراء</th></tr></thead><tbody>
+  ${closedDays.slice().reverse().map(d=>`<tr>
+    <td>${d.sessionNo||salesSessionNumber(d.dayKey)}</td>
+    <td>${d.dateKey||salesSessionDate(d.dayKey)}</td>
+    <td>${d.count||0}</td>
+    <td>${fmt(d.revenue||0)}</td>
+    <td>${fmt(d.debtCollected||0)}</td>
+    <td>${fmt(d.manualAdded||0)}</td>
+    <td>${fmt(d.profit||0)}</td>
+    <td><button class="gray" onclick="showClosedDay('${String(d.dayKey).replace(/'/g,"\\'")}')">عرض التفاصيل</button> <button class="blue" onclick="reopenSalesDay('${String(d.dayKey).replace(/'/g,"\\'")}')">🔓 إعادة فتح</button></td>
+  </tr>`).join("")||'<tr><td colspan="8">لا توجد حسابات مغلقة.</td></tr>'}
   </tbody></table></div>`;
 }
 function addCashToSales(){
