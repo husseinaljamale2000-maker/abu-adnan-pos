@@ -572,10 +572,23 @@ let sectionUnlockUntil=0;function sectionUnlocked(){return Date.now()<sectionUnl
 </div>`;window.sectionPassSuccess=onSuccess;openModal();setTimeout(()=>document.getElementById("sectionPassEntry")?.focus(),50)}function submitSectionPassword(){let entered=document.getElementById("sectionPassEntry").value;if(entered!==localStorage.getItem("posBlank40SectionPass")){document.getElementById("sectionPassError").textContent="كلمة المرور غير صحيحة";document.getElementById("sectionPassEntry").value="";return}sectionUnlockUntil=Date.now()+5*60*1000;let action=window.sectionPassSuccess;window.sectionPassSuccess=null;closeModal();if(action)action()}
 function page(p,authorized=false){const freePages=["sale","debts","notifications"];const protectedPage=!freePages.includes(p);if(protectedPage&&!window.ownerMode&&!authorized&&!sectionUnlocked()){if(p==="settings"&&!localStorage.getItem("posBlank40SectionPass")){alert("الإعدادات محمية. سجّل دخول المالك أولاً لتعيين رمز الأقسام.");return;}requestSectionPassword(()=>page(p,true));return;}current=p;document.getElementById("mainLayout").classList.toggle("full",p!=="sale");["sale","stock","purchase","sales","debts","notifications","settings"].forEach(x=>document.getElementById("nav-"+x).classList.toggle("active",p===x));document.getElementById("saleCart").style.display=p==="sale"?"flex":"none";document.getElementById("search").style.display=p==="sale"?"block":"none";if(p==="sale"){document.getElementById("work").style.display="block";showCats()}else{document.getElementById("work").style.display="block";document.getElementById("back").style.display="none";if(p==="stock"){stockActive=-1;stockPage();}if(p==="purchase")purchasePage();if(p==="sales")salesPage();if(p==="debts")debtsPage();if(p==="notifications")notificationsPage();if(p==="settings")settingsPage()}}
 function showCats(){active=-1;document.getElementById("heading").textContent="الأقسام الرئيسية";document.getElementById("hint").textContent="اختر القسم لعرض المنتجات";document.getElementById("back").style.display="none";document.getElementById("search").value="";draw(cats.map((c,i)=>({name:c.name,icon:c.icon,category:i})))}
-function showCat(i){active=i;document.getElementById("heading").textContent=cats[i].name;document.getElementById("hint").textContent="اختر المنتج لإضافته للفاتورة";document.getElementById("back").style.display="inline-block";draw(cats[i].products.map((p,j)=>({...p,category:i,index:j,icon:"🛍️"})))}
+function showCat(i){
+  active=i;
+  document.getElementById("heading").textContent=cats[i].name;
+  document.getElementById("hint").textContent="اختر المنتج لإضافته للفاتورة";
+  document.getElementById("back").style.display="inline-block";
+  let items=cats[i].products.map((p,j)=>({...p,category:i,index:j,icon:"🛍️"}));
+  if(cats[i].name==="أخرى"){
+    items.push({name:"إضافة مبلغ",icon:"💰",special:"cash"});
+  }
+  draw(items);
+}
 function draw(arr){let el=document.getElementById("catalog");el.className="grid";el.innerHTML="";arr.forEach(p=>{let b=document.createElement("button");b.className="tile"+(p.price!==undefined&&p.stock<=0?" unavailable":"");b.innerHTML=`<span class="emoji">${p.icon||"🛍️"}</span>
-<strong>${p.name}</strong>${p.price!==undefined?`<div class="price">${fmt(p.price)} ${p.unit==="kg"?"/ كغم":""}</div>
-<div class="stock">الكمية: ${p.stock} ${p.unit==="kg"?"كغم":"قطعة"}<br>${stockStatus(p.stock)}</div>`:""}`;if(p.price!==undefined&&p.stock<=0){b.disabled=true;b.title="هذا المنتج غير متوفر حالياً"}b.onclick=()=>p.category!==undefined?(p.index===undefined?showCat(p.category):add(p.category,p.index)):null;el.appendChild(b)})}
+<strong>${p.name}</strong>${p.special==="cash"?`<div class="price">إضافة نقدية للمبيعات</div>`:p.price!==undefined?`<div class="price">${fmt(p.price)} ${p.unit==="kg"?"/ كغم":""}</div>
+<div class="stock">الكمية: ${p.stock} ${p.unit==="kg"?"كغم":"قطعة"}<br>${stockStatus(p.stock)}</div>`:""}`;if(p.price!==undefined&&p.stock<=0){b.disabled=true;b.title="هذا المنتج غير متوفر حالياً"}b.onclick=()=>{
+  if(p.special==="cash"){addCashToSales();return;}
+  if(p.category!==undefined){p.index===undefined?showCat(p.category):add(p.category,p.index);}
+};el.appendChild(b)})}
 function add(ci,pi){
   let p=cats[ci].products[pi];
   if(p.stock<=0)return alert("هذا المنتج غير متوفر حالياً");
@@ -1185,7 +1198,6 @@ function salesPage(){
     <div class="stat"><span>إجمالي الأرباح</span><b>${fmt(profit)}</b></div>
   </div>
   <div class="actions">
-    <button class="green" onclick="addCashToSales()">💰 إضافة مبلغ إلى المبيعات</button>
     <button class="red" onclick="closeSalesDay()">🔒 إغلاق الحساب الحالي</button>
   </div>
   <h3>الفواتير والمبالغ في الحساب الحالي</h3>
