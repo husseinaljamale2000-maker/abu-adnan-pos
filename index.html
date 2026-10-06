@@ -224,6 +224,18 @@ function settingsPage(){document.getElementById("catalog").className="";document
 <button class="orange" onclick="saveOwnerAccount()">حفظ حساب المالك</button>
 </div>
 <hr>
+<h3>👤 إدارة حساب الكاشير</h3>
+<p class="muted">هذه الخانة تظهر للمالك فقط. إذا نسي الكاشير كلمة مروره، يستطيع المالك تعيين كلمة مرور جديدة له من هنا.</p>
+<div class="fields">
+<label>البريد الإلكتروني للكاشير<input id="cashierManageEmail" type="email" autocomplete="username" placeholder="cashier@example.com"></label>
+<label>كلمة المرور الجديدة<input id="cashierManageNewPass" type="password" autocomplete="new-password" placeholder="8 أحرف أو أكثر"></label>
+<label>تأكيد كلمة المرور<input id="cashierManageConfirmPass" type="password" autocomplete="new-password"></label>
+</div>
+<div class="actions">
+<button class="orange" onclick="changeCashierPasswordByOwner()">🔑 تغيير كلمة مرور الكاشير</button>
+</div>
+<p class="muted">لا يمكن لحساب الكاشير استخدام هذه العملية؛ التحقق من صلاحية المالك يتم أيضاً داخل Supabase.</p>
+<hr>
 <h4>🔐 استرجاع رمز الأقسام</h4>
 <p class="muted">إذا نُسي رمز الأقسام، حساب المالك يستطيع تعيين رمز جديد لجميع الأجهزة.</p>
 <div class="actions">
@@ -297,6 +309,33 @@ async function resetSectionPasswordAsOwner(){
     alert("تم إعادة تعيين رمز الأقسام بنجاح. أصبح الرمز الجديد فعالاً على المتجر.");
   }catch(e){alert("تعذر إعادة تعيين رمز الأقسام: "+e.message)}
 }
+async function changeCashierPasswordByOwner(){
+  if(!window.ownerMode)return alert("هذه العملية متاحة لحساب المالك فقط");
+  let email=document.getElementById("cashierManageEmail")?.value.trim().toLowerCase();
+  let pw=document.getElementById("cashierManageNewPass")?.value||"";
+  let cf=document.getElementById("cashierManageConfirmPass")?.value||"";
+  if(!email)return alert("أدخل البريد الإلكتروني لحساب الكاشير");
+  if(!email.includes("@"))return alert("أدخل بريداً إلكترونياً صحيحاً");
+  if(pw.length<8)return alert("كلمة مرور الكاشير يجب أن تكون 8 أحرف أو أكثر");
+  if(pw!==cf)return alert("كلمتا مرور الكاشير غير متطابقتين");
+  try{
+    let token=await cloudToken();
+    let shopId=localStorage.getItem("posBlank40ShopId");
+    if(!shopId){let ctx=await getShopContext(token);shopId=ctx.shop_id;}
+    let r=await fetch(SUPABASE_URL+"/functions/v1/update-cashier-password",{
+      method:"POST",
+      headers:{...cloudHeaders(token),"Authorization":"Bearer "+token},
+      body:JSON.stringify({shop_id:shopId,email,password:pw})
+    });
+    let d=await r.json().catch(()=>({}));
+    if(!r.ok)throw Error(d.error||d.message||"تعذر تغيير كلمة مرور الكاشير");
+    ["cashierManageNewPass","cashierManageConfirmPass"].forEach(id=>{let el=document.getElementById(id);if(el)el.value=""});
+    alert("تم تغيير كلمة مرور الكاشير بنجاح. يستطيع الآن الدخول بكلمة المرور الجديدة.");
+  }catch(e){
+    alert("تعذر تغيير كلمة مرور الكاشير: "+e.message);
+  }
+}
+
 async function saveOwnerAccount(){
   let email=document.getElementById("ownerUserNew")?.value.trim().toLowerCase(),pw=document.getElementById("ownerPassNew")?.value,cf=document.getElementById("ownerPassConfirm")?.value;
   if(!email)return alert("أدخل البريد الإلكتروني لحساب المالك");
