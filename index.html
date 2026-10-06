@@ -1,9 +1,14 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+<style id="no-double-tap-zoom">
+html, body, button, input, select, textarea, a, [role="button"] {
+    touch-action: manipulation;
+}
+</style>
 <meta name="abu-adnan-build" content="final-offline-sync-v1">
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>كاشير السوبر ماركت - إدارة متكاملة</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,Tahoma,sans-serif;background:#eef2f7;color:#172b4d}header{background:#123d68;color:#fff;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}h1{font-size:22px;margin:0}header input{width:min(360px,100%);padding:11px;border:0;border-radius:8px;font-size:15px}nav{display:flex;gap:7px;flex-wrap:wrap;padding:10px 14px;background:#fff;border-bottom:1px solid #dfe6ef}nav button{background:#e9f0f8;color:#174b7d}nav button.active{background:#176fc0;color:#fff}main{display:grid;grid-template-columns:minmax(0,1fr) 365px;gap:13px;padding:13px;max-width:1600px;margin:auto}main.full{grid-template-columns:minmax(0,1fr)}.panel{background:#fff;border-radius:12px;padding:14px;box-shadow:0 2px 10px #142b4810}.head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}h2{font-size:19px;margin:0}h3{margin:13px 0 8px}.muted{color:#718096;font-size:13px;margin-top:5px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:9px}.tile{border:1px solid #dce4ef;background:#f9fbfe;border-radius:10px;padding:12px 7px;min-height:110px;cursor:pointer;text-align:center;color:inherit}.tile:hover{border-color:#2475c7;background:#f0f7ff}.tile.unavailable{opacity:.55;filter:grayscale(.7);cursor:not-allowed;background:#f1f3f5;border-color:#ef4444}.tile.unavailable:hover{background:#f1f3f5;border-color:#ef4444}.emoji{font-size:28px;display:block;margin-bottom:7px}.tile strong{display:block;font-size:14px}.price{color:#1670c5;font-weight:bold;margin-top:6px}.stock{font-size:12px;color:#61738a;margin-top:5px}.low{color:#bd3d26;font-weight:bold}.stock-badge{display:inline-block;padding:4px 9px;border-radius:7px;font-size:12px;font-weight:bold;white-space:nowrap}.stock-ok{background:#dcfce7;color:#166534;border:1px solid #86efac}.stock-low{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}.stock-none{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}button{border:0;border-radius:8px;padding:9px 12px;cursor:pointer;font-weight:bold;font-size:14px}.blue{background:#176fc0;color:white}.green{background:#159447;color:white}.orange{background:#ed8b19;color:white}.red{background:#fce8e8;color:#a32323}.gray{background:#e7eef7;color:#174b7d}.cart{position:sticky;top:10px;height:calc(100vh - 95px);display:flex;flex-direction:column}.items{overflow:auto;flex:1;border-block:1px solid #e5eaf1;margin:10px 0}.cartrow{padding:10px 0;border-bottom:1px solid #edf0f5;display:flex;justify-content:space-between;gap:6px}.cartrow small{display:block;color:#718096;margin-top:4px}.qty{display:flex;align-items:center;gap:6px;margin-top:6px}.qty button{padding:3px 8px;background:#e9f0f8}.line{display:flex;justify-content:space-between;padding:6px 0}.total{font-size:21px;color:#176fc0;font-weight:bold}.pay{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.pay button{padding:13px 5px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}.stat{background:#f4f8fc;border:1px solid #e1eaf3;border-radius:10px;padding:13px}.stat span{font-size:13px;color:#64748b;display:block}.stat b{font-size:20px;display:block;margin-top:7px}.modal{position:fixed;inset:0;background:#10243b99;display:none;align-items:center;justify-content:center;padding:12px;z-index:4}.modal.show{display:flex}.dialog{background:#fff;width:min(760px,100%);max-height:92vh;overflow:auto;border-radius:13px;padding:17px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fields label{font-weight:bold;font-size:14px;display:block}.fields input,.fields select{display:block;width:100%;padding:10px;border:1px solid #cdd8e6;border-radius:7px;margin-top:5px;font-size:15px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.tablewrap{width:100%;overflow-x:hidden}table{border-collapse:collapse;width:100%;table-layout:fixed;min-width:0}th,td{padding:9px 6px;border-bottom:1px solid #e6ebf2;text-align:right;font-size:13px;overflow-wrap:anywhere;word-break:normal;vertical-align:middle}th{background:#f3f7fb;font-size:12px} @media(max-width:700px){th,td{padding:7px 4px;font-size:11px}th{font-size:10px}}.adminrow{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #e6ebf2;padding:9px 0}.adminrow small{display:block;color:#718096;margin-top:4px}.notice{background:#fff7df;border:1px solid #f4dda0;border-radius:8px;padding:10px;font-size:13px;margin-bottom:10px}@media(max-width:850px){main{grid-template-columns:1fr}.cart{position:relative;height:470px}.fields{grid-template-columns:1fr}}@media print{header,nav,.catalogpanel,.no-print{display:none!important}main{display:block;padding:0}.cart{height:auto;position:static;box-shadow:none}.items{overflow:visible}}
@@ -21,7 +26,9 @@
  .fields{grid-template-columns:1fr}.dialog{padding:12px;max-height:94dvh}.actions button{flex:1 1 130px}
  button{min-height:38px}input,select,textarea{font-size:16px!important}
 }
-<style>.notif{border:1px solid #f2d58a;background:#fffaf0;border-radius:10px;padding:12px;margin:8px 0}.notif strong{color:#a05a00}.invoice-detail-row{background:#f8fbff}.invoice-detail-row td{padding:12px}.owner-badge{background:#fff3cd;border:1px solid #f0d36b;padding:5px 9px;border-radius:7px;font-weight:bold}</style>
+<style>.notif{border:1px solid #f2d58a;background:#fffaf0;border-radius:10px;padding:12px;margin:8px 0}.notif strong{color:#a05a00}.invoice-detail-row{background:#f8fbff}.invoice-detail-row td{padding:12px}.owner-badge{background:#fff3cd;border:1px solid #f0d36b;padding:5px 9px;border-radius:7px;font-weight:bold}
+.saved-login-list{margin:8px 0 12px;padding:10px;background:#f7f9fc;border:1px solid #dfe6ef;border-radius:9px}.saved-login-title{font-size:13px;font-weight:bold;color:#174b7d;margin-bottom:7px}.saved-login-item{display:flex;align-items:center;gap:7px;margin-top:6px}.saved-login-item button{flex:1;margin:0!important;text-align:right;background:#eef5fb;color:#174b7d;border:1px solid #d5e2ef}.save-login-overlay{position:fixed;inset:0;background:#10243b99;display:none;align-items:center;justify-content:center;padding:16px;z-index:100}.save-login-overlay.show{display:flex}.save-login-card{background:#fff;width:min(430px,100%);padding:22px;border-radius:15px;box-shadow:0 18px 60px #00152c66}.save-login-card h3{margin:0 0 8px;text-align:center}.save-login-card .saved-field{background:#f7f9fc;border:1px solid #dfe6ef;border-radius:8px;padding:10px;margin-top:8px}.save-login-card .saved-field small{display:block;color:#64748b;margin-bottom:4px}.save-login-card .saved-password{letter-spacing:3px;font-weight:bold}.save-login-card .actions{display:flex;gap:8px;margin-top:14px}.save-login-card .actions button{flex:1}
+</style>
 <link rel="manifest" href="./manifest.webmanifest"><meta name="theme-color" content="#123d68"><link rel="apple-touch-icon" href="./apple-touch-icon.png"></head>
 <body>
 <div id="authVeil" class="authveil">
@@ -1386,7 +1393,7 @@ function renderAuth(){
   document.getElementById("authTitle").textContent="تسجيل الدخول";
   document.getElementById("authDesc").textContent="أدخل البريد الإلكتروني وكلمة المرور، وسيتم تحديد الحساب والصلاحيات تلقائياً";
   document.getElementById("authSubmit").textContent="تسجيل الدخول";
-  document.getElementById("authFields").innerHTML=`<label>البريد الإلكتروني</label>
+  document.getElementById("authFields").innerHTML=`${renderSavedLoginList()}<label>البريد الإلكتروني</label>
 <input id="authUser" type="email" autocomplete="username" placeholder="البريد الإلكتروني">
 <label>كلمة المرور</label>
 <input id="authPass" type="password" autocomplete="current-password" placeholder="كلمة المرور">`;
@@ -1398,6 +1405,73 @@ function handleTitleTap(){if(!window.ownerMode)return;revealSettings();if(curren
 document.addEventListener("DOMContentLoaded",function(){let t=document.getElementById("appTitle");if(t){t.addEventListener("click",handleTitleTap);t.addEventListener("touchend",function(e){e.preventDefault();handleTitleTap()},{passive:false})}});
 document.addEventListener("keydown",function(e){if(e.ctrlKey&&e.altKey&&e.shiftKey&&(e.key==="o"||e.key==="O")){e.preventDefault();if(!window.ownerMode)return;revealSettings();let panel=document.getElementById("ownerSettings");if(panel&&current==="settings")panel.style.display="block";}});
 window.ownerMode=false;
+let pendingSaveLogin=null;
+function getSavedLogins(){
+  try{return JSON.parse(localStorage.getItem("posBlank40SavedLogins")||"[]")}catch(e){return []}
+}
+function setSavedLogins(list){localStorage.setItem("posBlank40SavedLogins",JSON.stringify(list.slice(0,10)))}
+function renderSavedLoginList(){
+  const list=getSavedLogins();
+  if(!list.length)return "";
+  return `<div class="saved-login-list"><div class="saved-login-title">الحسابات المحفوظة على هذا الجهاز</div>${list.map((x,i)=>`<div class="saved-login-item"><button type="button" onclick="useSavedLogin(${i})">👤 ${escapeHtml(x.email)} <span style="float:left;letter-spacing:2px">••••••••</span></button><button type="button" class="gray" style="flex:0 0 auto;width:42px" onclick="removeSavedLogin(${i})" title="حذف">✕</button></div>`).join("")}</div>`;
+}
+function escapeHtml(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}
+function openSaveLoginPrompt(email,password,refreshToken,uid,role){
+  pendingSaveLogin={email,password,refreshToken,uid,role};
+  const e=document.getElementById("saveLoginEmail"); if(e)e.textContent=email;
+  const o=document.getElementById("saveLoginOverlay"); if(o){o.classList.add("show");o.setAttribute("aria-hidden","false")}
+}
+function closeSaveLoginPrompt(){
+  const o=document.getElementById("saveLoginOverlay"); if(o){o.classList.remove("show");o.setAttribute("aria-hidden","true")}
+  pendingSaveLogin=null;
+}
+function confirmSaveLogin(){
+  if(!pendingSaveLogin)return;
+  const p=pendingSaveLogin;
+  const list=getSavedLogins().filter(x=>x.email!==p.email);
+  list.unshift({email:p.email,refreshToken:p.refreshToken,uid:p.uid,role:p.role,savedAt:new Date().toISOString()});
+  setSavedLogins(list);
+  closeSaveLoginPrompt();
+  cloudMessage("🔐 تم حفظ تسجيل الدخول على هذا الجهاز.",false);
+}
+function cancelSaveLogin(){
+  closeSaveLoginPrompt();
+  cloudMessage("لم يتم حفظ تسجيل الدخول.",false);
+}
+async function useSavedLogin(index){
+  const item=getSavedLogins()[index];
+  if(!item?.refreshToken)return alert("بيانات تسجيل الدخول المحفوظة غير صالحة");
+  const btn=document.getElementById("authSubmit");
+  if(btn){btn.disabled=true;btn.textContent="جارٍ استرجاع تسجيل الدخول..."}
+  try{
+    const r=await fetch(SUPABASE_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{"apikey":SUPABASE_PUBLISHABLE_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:item.refreshToken})});
+    const d=await r.json();
+    if(!r.ok||!d.access_token||!d.user?.id)throw Error(d.msg||d.message||"تعذر استرجاع تسجيل الدخول");
+    localStorage.setItem("posBlank40CloudAccess",d.access_token);
+    localStorage.setItem("posBlank40CloudRefresh",d.refresh_token||item.refreshToken);
+    localStorage.setItem("posBlank40CloudRefreshKeep",d.refresh_token||item.refreshToken);
+    localStorage.setItem("posBlank40CloudUid",d.user.id);
+    localStorage.setItem("posBlank40AuthUid",d.user.id);
+    const ctx=await getShopContext(d.access_token);
+    if(!ctx||!ctx.role)throw Error("هذا الحساب غير مرتبط بمتجر أو لم يتم تحديد صلاحيته");
+    window.ownerMode=ctx.role==="owner";
+    localStorage.setItem("posBlank40Role",ctx.role);
+    document.getElementById("authVeil").style.display="none";
+    await initializeAutoSync();
+    applyAccessMode();
+    const list=getSavedLogins();
+    if(list[index]){list[index].refreshToken=d.refresh_token||list[index].refreshToken;list[index].uid=d.user.id;list[index].role=ctx.role;setSavedLogins(list)}
+  }catch(e){
+    alert("تعذر استرجاع تسجيل الدخول: "+e.message);
+    const list=getSavedLogins();list.splice(index,1);setSavedLogins(list);renderAuth();
+  }finally{if(btn){btn.disabled=false;btn.textContent="تسجيل الدخول"}}
+}
+function removeSavedLogin(index){
+  const list=getSavedLogins();
+  if(!list[index])return;
+  if(!confirm("حذف هذا الحساب من الحسابات المحفوظة على هذا الجهاز؟"))return;
+  list.splice(index,1);setSavedLogins(list);renderAuth();
+}
 async function submitAuth(){
   let email=document.getElementById("authUser").value.trim().toLowerCase(),password=document.getElementById("authPass").value;
   if(!email||!password)return alert("أدخل البريد الإلكتروني وكلمة المرور");
@@ -1416,6 +1490,7 @@ async function submitAuth(){
     await initializeAutoSync();
     applyAccessMode();
     alert(window.ownerMode?"تم تسجيل دخول حساب المالك. جميع أقسام المالك مفتوحة.":"تم تسجيل دخول حساب الكاشير. الأقسام المحمية تحتاج رمز الأقسام.");
+    setTimeout(()=>openSaveLoginPrompt(email,password,d.refresh_token||"",d.user.id,ctx.role),120);
   }catch(e){
     alert("تعذر تسجيل الدخول: "+e.message);
     ["posBlank40CloudAccess","posBlank40CloudRefresh","posBlank40CloudRefreshKeep","posBlank40CloudUid","posBlank40AuthUid","posBlank40ShopId","posBlank40Role"].forEach(k=>localStorage.removeItem(k));
