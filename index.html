@@ -808,8 +808,13 @@ function editPurchaseLine(i){
   let resolved=resolvePurchaseProduct(x);if(!resolved)return alert("تعذر العثور على المنتج المرتبط بهذه المشتريات");
   let oldCat=resolved.ci,oldPi=resolved.pi,oldP=resolved.p,oldCatObj=cats[oldCat],method=categoryPurchaseMethod(oldCatObj);
   let packs=x.packQty??x.qty,size=x.packSize??1,unitCost=Number(x.cost)||0;
-  let packCost=method==="weight"?unitCost:((x.totalCost!=null?Number(x.totalCost):((x.cost||0)*(x.qty||0)))/(Number(size)||1));
-  if(method==="piece") packCost=unitCost;
+  let packCost;
+  if(method==="package"){
+    const packCount=Number(packs)||1;
+    packCost=x.totalCost!=null?Number(x.totalCost)/packCount:unitCost*(Number(size)||1);
+  }else{
+    packCost=unitCost;
+  }
   let sale=x.salePrice??oldP.price,supplier=x.supplier||"",threshold=oldP.alertThreshold??0;
   let catOpts=cats.map((c,ci)=>`<option value="${ci}" ${ci===oldCat?"selected":""}>${c.name}</option>`).join("");
   document.getElementById("modalTitle").textContent="✏️ تعديل منتج في فاتورة رقم "+(x.invoiceNo||"—");
