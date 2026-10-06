@@ -889,10 +889,17 @@ function closePurchaseInvoice(){
   if(!confirm("إغلاق فاتورة المشتريات رقم "+invoiceNo+" بإجمالي "+fmt(total)+"؟"))return;
   purchaseDraftInvoiceNo=nextPurchaseInvoiceNo();save();purchasePage();alert("تم إغلاق فاتورة المشتريات رقم "+invoiceNo+" وفتح فاتورة جديدة رقم "+purchaseDraftInvoiceNo);
 }
+let purchaseSelectedCategory=0;
 function purchasePage(){
   let invoiceNo=ensurePurchaseDraft();
+  const currentCat=document.getElementById("buyCat")?.value;
+  if(currentCat!==undefined&&currentCat!==null&&currentCat!=="") purchaseSelectedCategory=+currentCat;
+  if(!Number.isInteger(purchaseSelectedCategory)||purchaseSelectedCategory<0||purchaseSelectedCategory>=cats.length)purchaseSelectedCategory=0;
   document.getElementById("catalog").className="";document.getElementById("heading").textContent="تسجيل مشتريات / توريد مخزون";document.getElementById("hint").textContent="رقم الفاتورة يتولد تلقائياً. أضف كل المنتجات على نفس الفاتورة ثم أغلقها عند الانتهاء";
-  let catOpts=cats.map((c,i)=>`<option value="${i}">${c.name} — ${purchaseMethodLabel(c)}</option>`).join(""),currentRows=purchaseInvoiceRows(invoiceNo),currentTotal=currentRows.reduce((a,{x})=>a+Number(x.totalCost??(x.qty||0)*(x.cost||0)),0);
+  let catOpts=cats.map((c,i)=>`<option value="${i}" ${i===purchaseSelectedCategory?"selected":""}>${c.name} — ${purchaseMethodLabel(c)}</option>`).join(""),currentRows=purchaseInvoiceRows(invoiceNo),currentTotal=currentRows.reduce((a,{x})=>a+Number(x.totalCost??(x.qty||0)*(x.cost||0)),0);
+  const invoiceMap=new Map();
+  purchases.forEach((x,i)=>{const no=String(x.invoiceNo||"—");if(!invoiceMap.has(no))invoiceMap.set(no,{invoiceNo:no,date:x.date,total:0,profit:0,count:0,firstIndex:i});const g=invoiceMap.get(no);g.total+=Number(x.totalCost??(x.qty||0)*(x.cost||0));g.profit+=Number(x.expectedProfit??0);g.count++;});
+  const invoiceRows=[...invoiceMap.values()];
   document.getElementById("catalog").innerHTML=`
   <div class="cards">
     <div class="stat"><span>🧾 الفاتورة الحالية</span><b>رقم ${invoiceNo}</b></div>
@@ -900,10 +907,10 @@ function purchasePage(){
     <div class="stat"><span>إجمالي الفاتورة الحالية</span><b>${fmt(currentTotal)}</b></div>
   </div>
   <div class="actions" style="margin:0 0 12px"><button class="green" onclick="closePurchaseInvoice()" ${currentRows.length?"":"disabled"}>🔒 إغلاق الفاتورة وفتح رقم جديد</button></div>
-  <div class="fields"><label style="grid-column:1/-1">🔢 رقم فاتورة الشراء<input id="buyInvoiceNo" type="text" value="${invoiceNo}" readonly></label></div>
+  <div class="fields" autocomplete="off"><label style="grid-column:1/-1">🔢 رقم فاتورة الشراء<input id="buyInvoiceNo" type="text" value="${invoiceNo}" readonly></label></div>
   <div class="fields" autocomplete="off"><label>القسم الرئيسي<select id="buyCat" onchange="purchaseCategoryChanged()">${catOpts}</select></label><label>المنتج<select id="buyProd" onchange="purchaseProductChanged()"></select></label></div>
   <div id="buyForm" style="margin-top:12px" autocomplete="off"><div class="fields">
-  <label id="newNameLabel">اسم المنتج الجديد<input id="buyNewName" placeholder="مثلاً: مارلبورو أحمر"></label>
+  <label id="newNameLabel" style="display:none">اسم المنتج الجديد<input id="buyNewName" placeholder="مثلاً: مارلبورو أحمر"></label>
   <label id="buyPacksLabel">عدد الكارتونات / الباكيتات المشتراة<input id="buyPacks" type="number" min=".001" step=".001" value="1"></label>
   <label id="buyPackSizeLabel">عدد العلب / الوحدات داخل الكرتون أو الباكيت<input id="buyPackSize" type="number" min=".001" step=".001" value="1"></label>
   <label id="buyPackCostLabel">سعر شراء الكرتون / الباكيت بالكامل (د.ع)<input id="buyPackCost" type="number" min="0" value="0"></label>
@@ -914,138 +921,43 @@ function purchasePage(){
   <label>اسم المورد (اختياري)<input id="supplier" placeholder="اسم المورد"></label>
   <label>حد تنبيه المخزون<input id="buyAlertThreshold" type="number" min="0" step=".001" value="0" placeholder="مثلاً 0.500"></label>
   </div>
-  <div class="cards" style="margin-top:12px"><div class="stat"><span>الكمية التي ستضاف للمخزون</span><b id="buyPreviewQty">1 قطعة</b></div><div class="stat"><span>تكلفة شراء الوحدة الواحدة</span><b id="buyPreviewCost">0 د.ع</b></div><div class="stat"><span>ربح الكرتون / الباكيت الواحد</span><b id="buyPreviewPackProfit">0 د.ع</b></div><div class="stat"><span>صافي الربح المتوقع لكل الكمية المشتراة</span><b id="buyPreviewTotalProfit">0 د.ع</b></div><div class="stat"><span>إجمالي هذه العملية</span><b id="buyPreviewTotal">0 د.ع</b></div></div>
+  <div class="cards" style="margin-top:12px"><div class="stat"><span>الكمية التي ستضاف للمخزون</span><b id="buyPreviewQty">0 قطعة</b></div><div class="stat"><span>تكلفة شراء الوحدة الواحدة</span><b id="buyPreviewCost">0 د.ع</b></div><div class="stat"><span>ربح الكرتون / الباكيت الواحد</span><b id="buyPreviewPackProfit">0 د.ع</b></div><div class="stat"><span>صافي الربح المتوقع لكل الكمية المشتراة</span><b id="buyPreviewTotalProfit">0 د.ع</b></div><div class="stat"><span>إجمالي هذه العملية</span><b id="buyPreviewTotal">0 د.ع</b></div></div>
   <div class="actions"><button class="green" onclick="recordPurchase()">➕ إضافة المنتج إلى الفاتورة</button><button class="red" onclick="clearPurchaseForm()">🗑️ مسح خانات المنتج</button></div></div>
   <h3>منتجات الفاتورة الحالية رقم ${invoiceNo}</h3>
   <div class="tablewrap"><table><thead><tr><th>المنتج</th><th>الكمية</th><th>تكلفة الوحدة</th><th>سعر البيع</th><th>الإجمالي</th><th>الإجراء</th></tr></thead><tbody>
   ${currentRows.map(({x,i})=>`<tr><td><b>${x.name}</b></td><td>${x.qty} ${x.unit==="kg"||x.weightProduct?"كغم":"وحدة"}</td><td>${fmt(x.cost)}</td><td>${fmt(x.salePrice||0)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td><button class="blue" onclick="editPurchaseLine(${i})">✏️ تعديل</button></td></tr>`).join("")||'<tr><td colspan="6">لم تضف أي منتج إلى هذه الفاتورة بعد.</td></tr>'}
   </tbody><tfoot><tr><th colspan="4">إجمالي الفاتورة الحالية</th><th>${fmt(currentTotal)}</th><th></th></tr></tfoot></table></div>
-  <h3>سجل المشتريات السابق</h3><div class="tablewrap"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>المنتج</th><th>العبوات</th><th>الوحدات/عبوة</th><th>الكمية</th><th>تكلفة الوحدة</th><th>الإجمالي</th><th>المورد</th></tr></thead><tbody>
-  ${purchases.slice(0,100).map((x,i)=>`<tr onclick="showPurchaseDetail(${i})" style="cursor:pointer" title="اضغط لعرض تفاصيل الفاتورة"><td>${x.invoiceNo||purchases.length-i}</td><td>${x.date}</td><td>${x.name}</td><td>${x.packQty??x.qty}</td><td>${x.packSize??1}</td><td>${x.qty} ${x.unit==="kg"||x.weightProduct?"كغم":"وحدة"}</td><td>${fmt(x.cost)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td>${x.supplier||"—"}</td></tr>`).join("")||'<tr><td colspan="9">لا توجد مشتريات مسجلة بعد</td></tr>'}</tbody></table></div>`;
+  <h3>سجل فواتير المشتريات السابق</h3><div class="tablewrap"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>عدد المنتجات</th><th>إجمالي الفاتورة</th><th>الربح المتوقع</th><th>التفاصيل</th></tr></thead><tbody>
+  ${invoiceRows.map(g=>`<tr onclick="showPurchaseDetail(${g.firstIndex})" style="cursor:pointer" title="اضغط لعرض تفاصيل الفاتورة"><td><b>${g.invoiceNo}</b></td><td>${g.date||"—"}</td><td>${g.count}</td><td>${fmt(g.total)}</td><td>${fmt(g.profit)}</td><td><button class="blue" onclick="event.stopPropagation();showPurchaseDetail(${g.firstIndex})">📋 عرض التفاصيل</button></td></tr>`).join("")||'<tr><td colspan="6">لا توجد فواتير مشتريات مغلقة/مسجلة بعد</td></tr>'}</tbody></table></div>`;
   purchaseCategoryChanged();
-  ["buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnit","buyCurrentQty"].forEach(id=>document.getElementById(id).addEventListener("input",updatePurchasePreview));
+  ["buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnit","buyCurrentQty","buyAlertThreshold"].forEach(id=>document.getElementById(id)?.addEventListener("input",updatePurchasePreview));
+}
+function purchaseCategoryChanged(){
+  const ci=+document.getElementById("buyCat").value;purchaseSelectedCategory=ci;
+  const sel=document.getElementById("buyProd");
+  sel.innerHTML=`<option value="">اختر المنتج</option>`+cats[ci].products.map((p,pi)=>`<option value="${pi}">${p.name}</option>`).join("")+`<option value="new">＋ إضافة منتج جديد</option>`;
+  sel.value="";purchaseProductChanged();
+}
+function purchaseProductChanged(){
+  let ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",p=(!isNew&&val!=="")?cats[ci].products[+val]:null,method=categoryPurchaseMethod(cats[ci]);
+  document.getElementById("newNameLabel").style.display=isNew?"block":"none";
+  if(val===""){["buyNewName","buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyCurrentQty","supplier","buyAlertThreshold"].forEach(id=>{let e=document.getElementById(id);if(e)e.value=""});document.getElementById("buyUnit").value=method;document.getElementById("buyUnitCostCalc").value="0 د.ع";document.getElementById("buyPacks").value="";document.getElementById("buyPackSize").value="";updatePurchaseFormLabels();updatePurchasePreview();return;}
+  document.getElementById("buyNewName").value="";document.getElementById("buyUnit").value=method;document.getElementById("buyPacks").value="1";document.getElementById("buyPackSize").value=method==="package"?(p?.packSize||"1"):"";document.getElementById("buyPackCost").value=p?(method==="package"?((p.cost||0)*(p.packSize||1)):(p.cost||0)):0;document.getElementById("buyUnitPrice").value=p?(p.price||0):0;document.getElementById("buyAlertThreshold").value=p?(p.alertThreshold??0):0;document.getElementById("buyCurrentQty").value="";updatePurchaseFormLabels();updatePurchasePreview();
 }
 function purchaseCategoryChanged(){let ci=+document.getElementById("buyCat").value,sel=document.getElementById("buyProd");sel.innerHTML=cats[ci].products.map((p,pi)=>`<option value="${pi}">${p.name}</option>`).join("")+`<option value="new">＋ إضافة منتج جديد</option>`;purchaseProductChanged()}
 function purchaseProductChanged(){let ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",p=isNew?null:cats[ci].products[+val],method=categoryPurchaseMethod(cats[ci]);document.getElementById("newNameLabel").style.display=isNew?"block":"none";document.getElementById("buyNewName").value="";document.getElementById("buyUnit").value=method;document.getElementById("buyPacks").value="1";document.getElementById("buyPackSize").value=method==="package"?(p?.packSize||"1"):"1";document.getElementById("buyPackCost").value=p?(method==="package"?((p.cost||0)*(p.packSize||1)):(p.cost||0)):0;document.getElementById("buyUnitPrice").value=p?(p.price||0):0;document.getElementById("buyAlertThreshold").value=p?(p.alertThreshold??0):0;document.getElementById("buyCurrentQty").value="";updatePurchaseFormLabels();updatePurchasePreview()}
 function updatePurchaseFormLabels(){let ci=+document.getElementById("buyCat").value,method=categoryPurchaseMethod(cats[ci]),l=document.getElementById("buyPacksLabel"),s=document.getElementById("buyPackSizeLabel"),c=document.getElementById("buyPackCostLabel"),q=document.getElementById("buyCurrentQtyLabel");l.firstChild.textContent=method==="weight"?"عدد الكيلوات المشتراة":method==="piece"?"عدد القطع المشتراة":"عدد الكارتونات / الباكيتات المشتراة";s.style.display=method==="package"?"block":"none";c.firstChild.textContent=method==="weight"?"سعر شراء الكيلو الواحد (د.ع)":method==="piece"?"سعر شراء القطعة الواحدة (د.ع)":"سعر شراء الكرتون / الباكيت بالكامل (د.ع)";q.firstChild.textContent=method==="weight"?"الكمية الموجودة حالياً بالكيلو غرام (اختياري)":method==="piece"?"الكمية الموجودة حالياً بالقطعة (اختياري)":"العلب / الوحدات الموجودة حالياً (اختياري)";let t=document.getElementById("buyAlertThreshold");if(t){t.step=method==="weight"?".001":".001";t.placeholder=method==="weight"?"مثلاً 0.500":method==="piece"?"مثلاً 5":"مثلاً 5";let lab=t.parentElement?.firstChild;if(lab)lab.textContent=method==="weight"?"حد تنبيه المخزون بالكيلو غرام":method==="piece"?"حد تنبيه المخزون بالقطعة":"حد تنبيه المخزون بالوحدة"}if(method!=="package")document.getElementById("buyPackSize").value="1"}
 function updatePurchasePreview(){let ci=+document.getElementById("buyCat").value,method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("buyPacks").value||0,size=+document.getElementById("buyPackSize").value||1,cost=+document.getElementById("buyPackCost").value||0,sale=+document.getElementById("buyUnitPrice").value||0,qty=method==="weight"||method==="piece"?packs:packs*size,unitCost=method==="package"?(size?cost/size:0):cost,unitProfit=sale-unitCost,totalProfit=unitProfit*qty,operationTotal=packs*cost;document.getElementById("buyPreviewQty").textContent=qty.toLocaleString("en-US")+" "+(method==="weight"?"كغم":"قطعة");document.getElementById("buyPreviewCost").textContent=fmt(unitCost);document.getElementById("buyUnitCostCalc").value=fmt(unitCost);document.getElementById("buyPreviewPackProfit").textContent=fmt(method==="package"?unitProfit*size:unitProfit*packs);document.getElementById("buyPreviewTotalProfit").textContent=fmt(totalProfit);document.getElementById("buyPreviewTotal").textContent=fmt(operationTotal);updatePurchaseFormLabels()}
-function recordPurchase(){let invoiceNo=ensurePurchaseDraft(),ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",name=isNew?document.getElementById("buyNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("buyPacks").value,size=method==="package"?(+document.getElementById("buyPackSize").value||0):1,packCost=+document.getElementById("buyPackCost").value,salePrice=+document.getElementById("buyUnitPrice").value,supplier=document.getElementById("supplier").value.trim(),alertThreshold=+document.getElementById("buyAlertThreshold").value||0,currentRaw=document.getElementById("buyCurrentQty").value.trim();if(isNew&&!name)return alert("اكتب اسم المنتج الجديد");if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");if(method==="package"&&(!Number.isFinite(size)||size<=0))return alert("أدخل عدد الوحدات داخل الكرتون / الباكيت");let qty=method==="weight"||method==="piece"?+packs.toFixed(3):+(packs*size).toFixed(3),unitCost=method==="package"?packCost/size:packCost,actualStock=currentRaw===""?qty:+Number(currentRaw).toFixed(3);if(currentRaw!==""&&(!Number.isFinite(actualStock)||actualStock<0))return alert("الكمية الموجودة حالياً غير صحيحة");if(isNew){p={name,price:salePrice,cost:unitCost,stock:actualStock,unit:method==="weight"?"kg":"piece",alertThreshold,categoryType:method};cats[ci].products.push(p)}else{p.price=salePrice;p.cost=unitCost;p.alertThreshold=alertThreshold;p.stock=actualStock;p.unit=method==="weight"?"kg":"piece";p.categoryType=method}p.packSize=method==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;p.stockUnit=p.unit;p.currentStockWasEntered=currentRaw!=="";p.stockInitialFromPurchase=currentRaw==="";purchases.unshift({invoiceNo,date:new Date().toLocaleString("ar-IQ"),category:cats[ci].name,name:p.name,qty,cost:unitCost,packQty:packs,packSize:method==="package"?size:1,totalCost:+(packs*packCost).toFixed(2),salePrice,expectedProfit:+((salePrice-unitCost)*qty).toFixed(2),supplier,ci,pi:cats[ci].products.indexOf(p),unit:p.unit,currentStock:actualStock,currentStockEntered:currentRaw!=="",weightProduct:method==="weight",purchaseMethod:method});save();purchasePage();clearPurchaseForm();alert("تمت إضافة "+p.name+" إلى فاتورة المشتريات رقم "+invoiceNo+".")}
-function clearPurchaseForm(){["buyNewName","buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnitCostCalc","buyCurrentQty","supplier","buyAlertThreshold"].forEach(id=>{let e=document.getElementById(id);if(e)e.value=id==="buyPacks"||id==="buyPackSize"?"1":id==="buyUnitCostCalc"?"0 د.ع":""});let b=document.getElementById("buyProd");if(b)b.selectedIndex=0;updatePurchasePreview()}
-function notificationsPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="التنبيهات";document.getElementById("hint").textContent="تنبيهات المخزون والعمليات التي تحتاج انتباهك";let low=[];cats.forEach(c=>c.products.forEach(p=>{let t=Number(p.alertThreshold??0);if(t>0&&Number(p.stock)<=t)low.push({name:p.name,stock:p.stock,threshold:t,cat:c.name,unit:p.unit});}));let debtAlerts=debts.filter(d=>d.amount>d.paid).length;document.getElementById("catalog").innerHTML=`<div class="cards">
-<div class="stat">
-<span>تنبيهات المخزون</span>
-<b>${low.length}</b>
-</div>
-<div class="stat">
-<span>ديون مفتوحة</span>
-<b>${debtAlerts}</b>
-</div>
-</div>${low.map(x=>`<div class="notif">
-<strong>⚠️ نقص مخزون</strong>
-<div>${x.cat} — <b>${x.name}</b>
-</div>
-<div>المتبقي: ${x.stock} ${x.unit==="kg"?"كغم":"قطعة"} — حد التنبيه: ${x.threshold}</div>
-</div>`).join("")||'<div class="notice">✅ لا توجد تنبيهات مخزون حالياً.</div>'}`}
-function clearPurchaseForm(){["buyNewName","buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnitCostCalc","buyCurrentQty","supplier","buyAlertThreshold"].forEach(id=>{let e=document.getElementById(id);if(e)e.value=id==="buyPacks"||id==="buyPackSize"?"1":id==="buyUnitCostCalc"?"0 د.ع":""});let b=document.getElementById("buyProd");if(b)b.selectedIndex=0;updatePurchasePreview()}
-function debtsPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="سجل الديون";document.getElementById("hint").textContent="اضغط على اسم الشخص لعرض المنتجات التي أخذها بالدين";let names=[...new Set(debts.map(d=>d.debtor))],total=debts.reduce((a,d)=>a+Math.max(0,d.amount-d.paid),0);document.getElementById("catalog").innerHTML=`<div class="head" style="margin-bottom:10px">
-<div><h3 style="margin:0">إدارة الديون</h3><div class="muted">أضف ديناً يدوياً حتى لو لم تكن هناك فاتورة بيع.</div></div>
-<button class="blue" onclick="addDebt()">➕ إضافة ديون</button>
-</div>
-<div class="cards">
-<div class="stat">
-<span>عدد الأشخاص</span>
-<b>${names.filter(n=>debts.some(d=>d.debtor===n&&d.amount>d.paid)).length}</b>
-</div>
-<div class="stat">
-<span>إجمالي الديون المتبقية</span>
-<b>${fmt(total)}</b>
-</div>
-</div>
-<div class="tablewrap">
-<table>
-<thead>
-<tr>
-<th>اسم الشخص</th>
-<th>إجمالي الدين</th>
-<th>المسدّد</th>
-<th>المتبقي</th>
-<th>الإجراء</th>
-</tr>
-</thead>
-<tbody>${names.map(name=>{let rows=debts.filter(d=>d.debtor===name),amount=rows.reduce((a,d)=>a+d.amount,0),paid=rows.reduce((a,d)=>a+d.paid,0),remain=amount-paid;return `<tr>
-<td>
-<button class="linklike" onclick="showDebtorDetails('${name.replace(/'/g,"\\\\'")}')">${name} 🔎</button>
-</td>
-<td>${fmt(amount)}</td>
-<td>${fmt(paid)}</td>
-<td>
-<b>${fmt(remain)}</b>
-</td>
-<td>${remain>0?`<button class="green" onclick="payDebt('${name.replace(/'/g,"\\\\'")}')">تسجيل تسديد</button>`:(window.ownerMode?`<button class="red" onclick="deleteDebtPerson('${name.replace(/'/g,"\\\\'")}')">🗑️ حذف</button>`:`<span class="stock-badge stock-ok">مسدد — حذف المالك فقط</span>`)}</td>
-</tr>`}).join("")||'<tr>\n<td colspan="5">لا توجد ديون مسجلة</td>\n</tr>'}</tbody>
-</table>
-</div>
-<div id="debtorDetails">
-</div>`}
-function deleteDebtPerson(name){if(!window.ownerMode)return alert("حذف سجل الدين مسموح للمالك فقط");let rows=debts.filter(d=>d.debtor===name),remain=rows.reduce((a,d)=>a+d.amount-d.paid,0);if(remain>0)return alert("لا يمكن حذف الشخص لأن عليه ديناً متبقياً");if(!confirm("حذف سجل " + name + " نهائياً؟"))return;debts=debts.filter(d=>d.debtor!==name);save();debtsPage()}
-function showDebtorDetails(name){let rows=debts.filter(d=>d.debtor===name),el=document.getElementById("debtorDetails");el.innerHTML=`<div class="actions" style="justify-content:space-between;align-items:center">
-<h3>فواتير ${name} بالدين</h3>
-<button class="gray" onclick="closeDebtorDetails()">✖ إغلاق التفاصيل</button>
-</div>
-<div class="tablewrap">
-<table>
-<thead>
-<tr>
-<th>تاريخ الفاتورة</th>
-<th>رقم الفاتورة</th>
-<th>المنتج</th>
-<th>الكمية</th>
-<th>سعر الوحدة</th>
-<th>الإجمالي</th>
-<th>المسدّد من الفاتورة</th>
-<th>المتبقي</th>
-<th>حالة الفاتورة</th>
-</tr>
-</thead>
-<tbody>${rows.map(d=>{let sale=sales.find(x=>x.id===d.invoiceId),remaining=Math.max(0,d.amount-d.paid),status=remaining<=0?"مغلقة ومسددّة":"مفتوحة";return sale?sale.items.map(it=>`<tr>
-<td>${d.date}</td>
-<td>${d.invoiceId}</td>
-<td>${it.name}</td>
-<td>${it.qty}</td>
-<td>${fmt(it.price)}</td>
-<td>${fmt(it.price*it.qty)}</td>
-<td>${fmt(d.paid)}</td>
-<td>${fmt(remaining)}</td>
-<td>
-<span class="stock-badge ${remaining<=0?"stock-ok":"stock-low"}">${status}</span>
-</td>
-</tr>`).join(""):`<tr>
-<td>${d.date}</td>
-<td>${d.invoiceId}</td>
-<td colspan="4">تفاصيل الفاتورة غير متاحة</td>
-<td>${fmt(d.paid)}</td>
-<td>${fmt(remaining)}</td>
-<td>${status}</td>
-</tr>`}).join("")}</tbody>
-</table>
-</div>
-<p class="hint">تُغلق الفاتورة تلقائياً عند تسديد كامل مبلغها، وتبقى مفتوحة إذا كان عليها مبلغ متبقٍ.</p>`}
-function closeDebtorDetails(){let el=document.getElementById("debtorDetails");if(el)el.innerHTML=""}
-function addDebt(){let name=prompt("أدخل اسم الشخص:");if(name===null)return;name=name.trim();if(!name)return alert("اسم الشخص مطلوب");let raw=prompt("أدخل مبلغ الدين:");if(raw===null)return;let amount=Number(raw);if(!Number.isFinite(amount)||amount<=0)return alert("أدخل مبلغاً صحيحاً أكبر من صفر");let now=new Date(),id=Date.now(),date=now.toLocaleString("ar-IQ");debts.unshift({id,debtor:name,amount:+amount.toFixed(2),paid:0,date,invoiceId:"DEBT-"+id,items:[]});save();debtsPage();alert("تمت إضافة دين بمبلغ "+fmt(amount)+" على "+name)}
-function payDebt(name){let rows=debts.filter(d=>d.debtor===name&&d.amount>d.paid),remain=rows.reduce((a,d)=>a+d.amount-d.paid,0);if(!remain)return alert("لا يوجد مبلغ متبقٍ");let raw=prompt("المبلغ المتبقي: "+fmt(remain)+"\\nأدخل مبلغ التسديد:");if(raw===null)return;let amount=Number(raw);if(!Number.isFinite(amount)||amount<=0)return alert("أدخل مبلغاً صحيحاً أكبر من صفر");if(amount>remain)return alert("مبلغ التسديد أكبر من الدين المتبقي");let left=amount;rows.forEach(d=>{let due=d.amount-d.paid,take=Math.min(due,left);d.paid=+(d.paid+take).toFixed(2);left=+(left-take).toFixed(2)});let now=new Date(),id=Date.now(),date=now.toLocaleString("ar-IQ");sales.unshift({id,dayKey:ensureActiveSalesSession(),date,method:"تسديد دين",debtor:name,items:[],subtotal:amount,discount:0,total:amount,profit:0,debtCollection:true});save();debtsPage();alert("تم تسجيل تسديد "+fmt(amount)+" من دين "+name+" وإضافته إلى سجل المبيعات")}
-function salesPage(){
-  document.getElementById("catalog").className="";document.getElementById("heading").textContent="سجل المبيعات والأرباح";document.getElementById("hint").textContent="إغلاق الحساب يصفّر شاشة الحساب الحالية فقط، وتبقى الفواتير محفوظة في سجل الإغلاقات ويمكن إعادة فتحها";
-  let key=ensureActiveSalesSession(),dateLabel=salesSessionDate(key),todaySales=sales.filter(x=>x.dayKey===key),rev=todaySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.total,0),paidDebts=todaySales.filter(x=>x.debtCollection).reduce((a,x)=>a+x.total,0),income=todaySales.filter(x=>x.method!=="دين").reduce((a,x)=>a+x.total,0),profit=todaySales.filter(x=>!x.debtCollection).reduce((a,x)=>a+x.profit,0);
-  document.getElementById("catalog").innerHTML=`<h3>حسابات الفاتورة الحالية — ${dateLabel}</h3>
-  <div class="cards"><div class="stat"><span>عدد فواتير الحالية</span><b>${todaySales.length}</b></div><div class="stat"><span>إجمالي المبيعات الحالية</span><b>${fmt(rev)}</b></div><div class="stat"><span>الدخل المستلم الحالي</span><b>${fmt(income)}</b></div><div class="stat"><span>الديون المسددة الحالية</span><b>${fmt(paidDebts)}</b></div><div class="stat"><span>إجمالي أرباح الحالية</span><b style="color:${profit<0?'#bd3d26':'#159447'}">${fmt(profit)}</b></div></div>
-  <div class="actions" style="margin:12px 0"><button class="green" onclick="closeSalesDay()" ${todaySales.length?"":"disabled"}>🔒 إغلاق الفاتورة / اليوم وفتح حساب جديد</button></div>
-  <div class="notice">عند الإغلاق تُحفظ هذه الفواتير في سجل الإغلاقات وتصبح الحسابات أعلاه صفراً. يمكنك لاحقاً الضغط على «إعادة فتح» لإرجاع نفس الحساب.</div>
-  <div class="tablewrap"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ والوقت</th><th>عدد المنتجات</th><th>طريقة الدفع</th><th>المبيعات / التسديد</th><th>الربح</th></tr></thead><tbody>
-  ${todaySales.map((x,i)=>`<tr><td>${todaySales.length-i} <button class="gray" style="padding:4px 8px" onclick="toggleInvoiceInline(${x.id})">▶</button></td><td>${x.date}</td><td>${(x.items||[]).length}</td><td>${x.method}</td><td>${fmt(x.total)}</td><td>${fmt(x.profit)}</td></tr><tr id="invoiceInline_${x.id}" class="invoice-detail-row" style="display:none"><td colspan="6"><div id="invoiceInlineBody_${x.id}"></div></td></tr>`).join("")||'<tr><td colspan="6">لا توجد فواتير في الحساب الحالي.</td></tr>'}</tbody>
-  <tfoot><tr style="font-weight:bold;background:#e8f5ee"><td colspan="4">إجمالي المبيعات</td><td>${fmt(rev)}</td><td style="color:${profit<0?"#bd3d26":"#159447"}">${fmt(profit)}</td></tr><tr style="font-weight:bold"><td colspan="4">الديون المسددة</td><td>${fmt(paidDebts)}</td><td>—</td></tr><tr style="font-weight:bold;background:#e8f5ee"><td colspan="4">الدخل المستلم</td><td>${fmt(income)}</td><td>—</td></tr></tfoot></table></div>
-  <h3 style="margin-top:22px">سجل الإغلاقات السابقة</h3><div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>رقم الجلسة</th><th>عدد الفواتير</th><th>إجمالي المبيعات</th><th>إجمالي الأرباح</th><th>التفاصيل</th></tr></thead><tbody>
-  ${closedDays.slice().sort((a,b)=>String(b.closedAt||b.dayKey).localeCompare(String(a.closedAt||a.dayKey))).map(d=>`<tr><td>${salesSessionDate(d.dayKey)}</td><td>${salesSessionNumber(d.dayKey)}</td><td>${d.count}</td><td>${fmt(d.revenue)}</td><td>${fmt(d.profit)}</td><td><button class="gray" onclick="showClosedDay('${String(d.dayKey).replace(/'/g,"\\'")}')">عرض</button> <button class="blue" onclick="reopenSalesDay('${String(d.dayKey).replace(/'/g,"\\'")}')">إعادة فتح</button></td></tr>`).join("")||'<tr><td colspan="6">لم يتم حفظ إغلاقات بعد.</td></tr>'}</tbody></table></div>
-  <div id="invoiceDetails"></div><div class="actions" style="margin-top:12px"><button class="gray" onclick="exportData()">تصدير نسخة احتياطية JSON</button><button class="red" onclick="resetSales()">مسح سجل المبيعات</button></div>`;
+function recordPurchase(){let invoiceNo=ensurePurchaseDraft(),ci=+document.getElementById("buyCat").value;purchaseSelectedCategory=ci;let val=document.getElementById("buyProd").value,isNew=val==="new",name=isNew?document.getElementById("buyNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("buyPacks").value,size=method==="package"?(+document.getElementById("buyPackSize").value||0):1,packCost=+document.getElementById("buyPackCost").value,salePrice=+document.getElementById("buyUnitPrice").value,supplier=document.getElementById("supplier").value.trim(),alertThreshold=+document.getElementById("buyAlertThreshold").value||0,currentRaw=document.getElementById("buyCurrentQty").value.trim();if(isNew&&!name)return alert("اكتب اسم المنتج الجديد");if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");if(method==="package"&&(!Number.isFinite(size)||size<=0))return alert("أدخل عدد الوحدات داخل الكرتون / الباكيت");let qty=method==="weight"||method==="piece"?+packs.toFixed(3):+(packs*size).toFixed(3),unitCost=method==="package"?packCost/size:packCost,actualStock=currentRaw===""?qty:+Number(currentRaw).toFixed(3);if(currentRaw!==""&&(!Number.isFinite(actualStock)||actualStock<0))return alert("الكمية الموجودة حالياً غير صحيحة");if(isNew){p={name,price:salePrice,cost:unitCost,stock:actualStock,unit:method==="weight"?"kg":"piece",alertThreshold,categoryType:method};cats[ci].products.push(p)}else{p.price=salePrice;p.cost=unitCost;p.alertThreshold=alertThreshold;p.stock=actualStock;p.unit=method==="weight"?"kg":"piece";p.categoryType=method}p.packSize=method==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;p.stockUnit=p.unit;p.currentStockWasEntered=currentRaw!=="";p.stockInitialFromPurchase=currentRaw==="";purchases.unshift({invoiceNo,date:new Date().toLocaleString("ar-IQ"),category:cats[ci].name,name:p.name,qty,cost:unitCost,packQty:packs,packSize:method==="package"?size:1,totalCost:+(packs*packCost).toFixed(2),salePrice,expectedProfit:+((salePrice-unitCost)*qty).toFixed(2),supplier,ci,pi:cats[ci].products.indexOf(p),unit:p.unit,currentStock:actualStock,currentStockEntered:currentRaw!=="",weightProduct:method==="weight",purchaseMethod:method});save();purchasePage();clearPurchaseForm();alert("تمت إضافة "+p.name+" إلى فاتورة المشتريات رقم "+invoiceNo+".")}
+function clearPurchaseForm(){
+  const keepCat=document.getElementById("buyCat")?.value ?? String(purchaseSelectedCategory||0);
+  purchaseSelectedCategory=+keepCat||0;
+  ["buyNewName","buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnitCostCalc","buyCurrentQty","supplier","buyAlertThreshold"].forEach(id=>{const e=document.getElementById(id);if(e)e.value=""});
+  const b=document.getElementById("buyProd");
+  if(b){b.innerHTML=`<option value="">اختر المنتج</option>`+cats[purchaseSelectedCategory].products.map((p,pi)=>`<option value="${pi}">${p.name}</option>`).join("")+`<option value="new">＋ إضافة منتج جديد</option>`;b.value="";}
+  const u=document.getElementById("buyUnit");if(u)u.value=categoryPurchaseMethod(cats[purchaseSelectedCategory]);
+  const calc=document.getElementById("buyUnitCostCalc");if(calc)calc.value="0 د.ع";
+  updatePurchaseFormLabels();updatePurchasePreview();
 }
 function closeSalesDay(){
   let key=ensureActiveSalesSession(),daySales=sales.filter(x=>x.dayKey===key);if(!daySales.length)return alert("لا توجد فواتير في الحساب الحالي حتى يتم إغلاقه");
