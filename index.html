@@ -122,6 +122,16 @@ function ensureWeightCategory(){
   c.products.forEach(p=>{p.unit="kg";p.cost=Number(p.cost)||0;p.price=Number(p.price)||0;p.stock=Number(p.stock)||0});
 }
 ensureWeightCategory();
+function normalizeCategoryMethods(){
+  cats.forEach(c=>{
+    if(c.name==="الكميات بالوزن") c.purchaseMethod="weight";
+    else if(!["weight","package","piece"].includes(c.purchaseMethod)) c.purchaseMethod="package";
+    if(c.purchaseMethod==="weight") c.products.forEach(p=>{p.unit="kg";p.categoryType="weight"});
+    if(c.purchaseMethod==="piece") c.products.forEach(p=>{if(p.unit!=="kg")p.unit="piece";p.categoryType="piece"});
+    if(c.purchaseMethod==="package") c.products.forEach(p=>{if(!p.unit||p.unit==="kg")p.unit="piece";p.categoryType="package"});
+  });
+}
+normalizeCategoryMethods();
 if(localStorage.getItem("posBlank40ProductsClearedV1")!=="yes"){cats=cats.map(c=>({...c,products:[]}));localStorage.setItem("posBlank40ProductsClearedV1","yes");localStorage.setItem("posBlank40Cats",JSON.stringify(cats));}
 cats.forEach(c=>c.products.forEach(p=>{if(p.cost===undefined)p.cost=0;if(p.stock===undefined)p.stock=0;if(!p.unit)p.unit="piece"}));
 let cart=[],active=-1,current="sale",sales=JSON.parse(localStorage.getItem("posBlank40Sales")||"[]"),purchases=JSON.parse(localStorage.getItem("posBlank40Purchases")||"[]"),closedDays=JSON.parse(localStorage.getItem("posBlank40ClosedDays")||"[]"),debts=JSON.parse(localStorage.getItem("posBlank40Debts")||"[]"),activeSalesDay=localStorage.getItem("posBlank40ActiveSalesDay")||null;
@@ -357,7 +367,9 @@ function openCategorySettings(){
   <div class="fields">
     <label>اسم القسم<input id="settingsNewCat" placeholder="مثلاً: المثلجات"></label>
     <label>الرمز<input id="settingsNewIcon" value="🛒" placeholder="🛒"></label>
+    <label>طريقة الشراء في هذا القسم<select id="settingsNewMethod"><option value="package">كارتون / باكيت + وحدات داخله</option><option value="weight">بالوزن (كغم / غرام)</option><option value="piece">بالقطعة مباشرة</option></select></label>
   </div>
+  <div class="notice">كل قسم له طريقة شراء خاصة به، وتُستخدم نفس الطريقة تلقائياً عند إضافة المنتج أو تعديل فاتورة المشتريات.</div>
   <div class="actions"><button class="blue" onclick="addCategoryFromSettings()">➕ إضافة القسم</button></div>
   <hr><h3>الأقسام الحالية</h3><div id="settingsCategoryList"></div>`;
   renderCategorySettings();
@@ -366,10 +378,10 @@ function openCategorySettings(){
 function renderCategorySettings(){
   let box=document.getElementById("settingsCategoryList");
   if(!box)return;
-  box.innerHTML=cats.map((c,i)=>`<div class="adminrow"><div><b>${c.icon||"🛒"} ${c.name}</b><small>${c.products.length} منتج</small></div><div class="actions"><button class="gray" onclick="renameCategoryFromSettings(${i})">تعديل</button><button class="red" onclick="deleteCategoryFromSettings(${i})">حذف</button></div></div>`).join("")||'<p class="muted">لا توجد أقسام.</p>';
+  box.innerHTML=cats.map((c,i)=>`<div class="adminrow"><div><b>${c.icon||"🛒"} ${c.name}</b><small>${c.products.length} منتج — طريقة الشراء: ${purchaseMethodLabel(c)}</small></div><div class="actions"><button class="gray" onclick="renameCategoryFromSettings(${i})">تعديل</button><button class="red" onclick="deleteCategoryFromSettings(${i})">حذف</button></div></div>`).join("")||'<p class="muted">لا توجد أقسام.</p>';
 }
-function addCategoryFromSettings(){let n=document.getElementById("settingsNewCat")?.value.trim(),ic=document.getElementById("settingsNewIcon")?.value.trim()||"🛒";if(!n)return alert("اكتب اسم القسم");if(cats.some(c=>c.name.trim()===n))return alert("هذا القسم موجود مسبقاً");cats.push({name:n,icon:ic,products:[]});save();renderCategorySettings();showCats();alert("تمت إضافة القسم بنجاح")}
-function renameCategoryFromSettings(i){let n=prompt("اسم القسم الجديد",cats[i]?.name||"");if(n===null)return;n=n.trim();if(!n)return alert("اكتب اسم القسم");if(cats.some((c,ci)=>ci!==i&&c.name.trim()===n))return alert("هذا القسم موجود مسبقاً");cats[i].name=n;save();renderCategorySettings();showCats()}
+function addCategoryFromSettings(){let n=document.getElementById("settingsNewCat")?.value.trim(),ic=document.getElementById("settingsNewIcon")?.value.trim()||"🛒",method=document.getElementById("settingsNewMethod")?.value||"package";if(!n)return alert("اكتب اسم القسم");if(cats.some(c=>c.name.trim()===n))return alert("هذا القسم موجود مسبقاً");if(!["weight","package","piece"].includes(method))method="package";cats.push({name:n,icon:ic,purchaseMethod:method,products:[]});save();renderCategorySettings();showCats();alert("تمت إضافة القسم بنجاح. طريقة الشراء: "+purchaseMethodLabel(cats[cats.length-1]))}
+function renameCategoryFromSettings(i){let c=cats[i];if(!c)return;let n=prompt("اسم القسم الجديد",c.name||"");if(n===null)return;n=n.trim();if(!n)return alert("اكتب اسم القسم");if(cats.some((x,ci)=>ci!==i&&x.name.trim()===n))return alert("هذا القسم موجود مسبقاً");let current=categoryPurchaseMethod(c),method=prompt("طريقة الشراء الحالية: "+purchaseMethodLabel(c)+"\nاكتب: weight = بالوزن، package = كارتون/باكيت، piece = بالقطعة",current);if(method===null)return;method=method.trim().toLowerCase();if(!["weight","package","piece"].includes(method))return alert("اكتب weight أو package أو piece");c.name=n;c.purchaseMethod=method;c.products.forEach(p=>{p.categoryType=method;p.unit=method==="weight"?"kg":"piece";if(method!=="package")p.packSize=1;});save();renderCategorySettings();showCats()}
 function deleteCategoryFromSettings(i){let c=cats[i];if(!c)return;if(c.products.length)return alert("لا يمكن حذف قسم يحتوي على منتجات. احذف المنتجات أولاً.");if(!confirm("حذف القسم "+c.name+"؟"))return;cats.splice(i,1);save();renderCategorySettings();showCats()}
 
 async function changeOwnerPasswordFromSettings(){
@@ -583,11 +595,17 @@ function openModal(){document.getElementById("modal").classList.add("show")}func
 function openAdmin(authorized=false){if(!window.ownerMode&&!authorized&&!sectionUnlocked()){requestSectionPassword(()=>openAdmin(true));return}document.getElementById("modalTitle").textContent="إدارة المنتجات والأقسام";adminView();openModal()}
 function adminView(){let b=document.getElementById("modalBody");b.innerHTML=`<h3>إضافة قسم</h3>
 <div class="fields">
-<label>اسم القسم<input id="newCat" placeholder="مثلاً: المثلجات">
+<label>اسم القسم<input id="newCat" placeholder="مثلاً: الجكاير">
 </label>
 <label>الرمز<input id="newIcon" value="🛒">
 </label>
+<label>طريقة الشراء للقسم<select id="newCatMethod">
+<option value="package">بالكارتون / الباكيت (عبوات)</option>
+<option value="piece">بالقطعة مباشرة</option>
+<option value="weight">بالوزن (كيلو / غرام)</option>
+</select></label>
 </div>
+<div class="notice">كل قسم له طريقة شراء مستقلة. ويمكن تغيير طريقة القسم لاحقاً من «تعديل القسم».</div>
 <div class="actions">
 <button class="blue" onclick="addCat()">إضافة القسم</button>
 </div>
@@ -631,9 +649,12 @@ function adminView(){let b=document.getElementById("modalBody");b.innerHTML=`<h3
 </div>`;products.appendChild(r)})}else{products.innerHTML=`<div class="adminrow">
 <small>لا توجد منتجات في هذا القسم</small>
 </div>`}list.appendChild(products)})}
-function toggleAdminProducts(ci){let el=document.getElementById("adminProducts_"+ci),btn=document.getElementById("adminArrow_"+ci);if(!el||!btn)return;let open=el.style.display!=="none";el.style.display=open?"none":"block";btn.textContent=open?"▸ عرض المنتجات":"▾ إخفاء المنتجات"}function addCat(){let n=document.getElementById("newCat").value.trim(),ic=document.getElementById("newIcon").value.trim()||"🛒";if(!n)return alert("اكتب اسم القسم");cats.push({name:n,icon:ic,products:[]});save();adminView()}
+function toggleAdminProducts(ci){let el=document.getElementById("adminProducts_"+ci),btn=document.getElementById("adminArrow_"+ci);if(!el||!btn)return;let open=el.style.display!=="none";el.style.display=open?"none":"block";btn.textContent=open?"▸ عرض المنتجات":"▾ إخفاء المنتجات"}
+function addCat(){let n=document.getElementById("newCat").value.trim(),ic=document.getElementById("newIcon").value.trim()||"🛒",method=document.getElementById("newCatMethod")?.value||"package";if(!n)return alert("اكتب اسم القسم");if(cats.some(c=>c.name===n))return alert("هذا القسم موجود مسبقاً");cats.push({name:n,icon:ic,purchaseMethod:method,products:[]});save();adminView()}
+function categoryPurchaseMethod(c){if(!c)return "package";if(c.name==="الكميات بالوزن")return "weight";return ["weight","package","piece"].includes(c.purchaseMethod)?c.purchaseMethod:"package"}
+function purchaseMethodLabel(c){let m=categoryPurchaseMethod(c);return m==="weight"?"بالوزن (كغم / غرام)":m==="piece"?"بالقطعة مباشرة":"بالكارتون / الباكيت"}
 function addProd(){let ci=+document.getElementById("prodCat").value,n=document.getElementById("prodName").value.trim(),price=+document.getElementById("prodPrice").value,cost=+document.getElementById("prodCost").value,stock=+document.getElementById("prodStock").value,u=document.getElementById("prodUnit").value;if(!n||!Number.isFinite(price)||price<0||!Number.isFinite(cost)||cost<0||!Number.isFinite(stock)||stock<0)return alert("أدخل بيانات صحيحة");cats[ci].products.push({name:n,price,cost,stock,unit:u});save();adminView()}
-function renameCat(i){let n=prompt("اسم القسم الجديد",cats[i].name);if(n&&n.trim()){cats[i].name=n.trim();save();adminView()}}function deleteCat(i){if(!confirm("حذف القسم ومنتجاته؟"))return;cats.splice(i,1);save();adminView()}
+function renameCat(i){let c=cats[i],n=prompt("اسم القسم الجديد",c.name);if(n===null)return;n=n.trim();if(!n)return;let current=categoryPurchaseMethod(c),method=prompt("طريقة الشراء: weight = بالوزن، package = كارتون/باكيت، piece = بالقطعة",current);if(method===null)return;method=method.trim().toLowerCase();if(!["weight","package","piece"].includes(method))return alert("اكتب weight أو package أو piece");if(method==="weight"){c.name=n;c.purchaseMethod="weight";c.products.forEach(p=>{p.unit="kg";p.categoryType="weight"})}else{c.name=n;c.purchaseMethod=method;c.products.forEach(p=>{p.categoryType=method;if(method!=="weight")p.unit="piece"})}save();adminView()}function deleteCat(i){if(!confirm("حذف القسم ومنتجاته؟"))return;cats.splice(i,1);save();adminView()}
 function editSelectedProd(ci){let sel=document.getElementById("adminPick_"+ci);if(!sel||sel.value==="")return alert("اختر المنتج الذي تريد تعديله أولاً");editProd(ci,+sel.value)}function editProd(ci,pi){let p=cats[ci].products[pi],n=prompt("اسم المنتج",p.name);if(n===null)return;let price=prompt("سعر البيع",p.price);if(price===null)return;let cost=prompt("سعر الشراء للوحدة",p.cost);if(cost===null)return;let stock=prompt("الكمية الحالية",p.stock);if(stock===null)return;if(!n.trim()||[price,cost,stock].some(v=>!Number.isFinite(+v)||+v<0))return alert("بيانات غير صحيحة");Object.assign(p,{name:n.trim(),price:+price,cost:+cost,stock:+stock});save();adminView()}
 function deleteProd(ci,pi){if(!confirm("حذف المنتج؟"))return;cats[ci].products.splice(pi,1);save();adminView()}
 let stockActive=-1;function stockBack(){if(current!=="stock"){showCats();return}if(stockActive>=0){stockActive=-1;stockPage()}else{page("sale")}}function stockPage(){document.getElementById("catalog").className="";let all=cats.flatMap(c=>c.products.map(p=>({...p,cat:c.name})));let el=document.getElementById("catalog");if(stockActive<0){document.getElementById("heading").textContent="المخزون حسب الأقسام";document.getElementById("hint").textContent="اختر القسم لعرض المنتجات والكميات والأسعار";document.getElementById("back").style.display="none";el.innerHTML=`<div class="cards">
@@ -783,43 +804,66 @@ function showPurchaseDetail(i){
 function editPurchaseLine(i){
   let x=purchases[i];if(!x)return;
   let resolved=resolvePurchaseProduct(x);if(!resolved)return alert("تعذر العثور على المنتج المرتبط بهذه المشتريات");
-  let isWeight=x.unit==="kg"||x.weightProduct||resolved.p.unit==="kg"||resolved.p.categoryType==="weight"||resolved.catName==="الكميات بالوزن"||x.category==="الكميات بالوزن";
-  let packs=x.packQty??x.qty,size=x.packSize??1;
-  let packCost=isWeight?(Number(x.cost)||0):((x.totalCost!=null?Number(x.totalCost):((x.cost||0)*(x.qty||0)))/(Number(size)||1));
-  let sale=x.salePrice??resolved.p.price,supplier=x.supplier||"",threshold=resolved.p.alertThreshold??0;
+  let oldCat=resolved.ci,oldPi=resolved.pi,oldP=resolved.p,oldCatObj=cats[oldCat],method=categoryPurchaseMethod(oldCatObj);
+  let packs=x.packQty??x.qty,size=x.packSize??1,unitCost=Number(x.cost)||0;
+  let packCost=method==="weight"?unitCost:((x.totalCost!=null?Number(x.totalCost):((x.cost||0)*(x.qty||0)))/(Number(size)||1));
+  if(method==="piece") packCost=unitCost;
+  let sale=x.salePrice??oldP.price,supplier=x.supplier||"",threshold=oldP.alertThreshold??0;
+  let catOpts=cats.map((c,ci)=>`<option value="${ci}" ${ci===oldCat?"selected":""}>${c.name}</option>`).join("");
   document.getElementById("modalTitle").textContent="✏️ تعديل منتج في فاتورة رقم "+(x.invoiceNo||"—");
-  document.getElementById("modalBody").innerHTML=`<p><b>${x.name}</b></p><div class="notice">المخزون الحالي: <b>${fmt(resolved.p.stock)} ${isWeight?"كغم":"وحدة"}</b></div><div class="fields">
-  ${isWeight?`
-  <label>عدد الكيلوات المشتراة<input id="editBuyPacks" type="number" min=".001" step=".001" value="${packs}"></label>
-  <label>سعر شراء الكيلو الواحد (د.ع)<input id="editBuyPackCost" type="number" min="0" step=".01" value="${packCost}"></label>
-  <label>سعر بيع الكيلو الواحد (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>`:`
-  <label>عدد الكراتين / الباكيتات<input id="editBuyPacks" type="number" min=".01" step=".01" value="${packs}"></label>
-  <label>الوحدات داخل العبوة<input id="editBuyPackSize" type="number" min=".001" step=".001" value="${size}"></label>
-  <label>سعر شراء العبوة بالكامل (د.ع)<input id="editBuyPackCost" type="number" min="0" step=".01" value="${packCost}"></label>
-  <label>سعر بيع الوحدة (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>`}
-  <label>اسم المورد<input id="editBuySupplier" value="${String(supplier).replace(/"/g,'&quot;')}"></label>
-  <label>حد تنبيه المخزون<input id="editBuyThreshold" type="number" min="0" step="1" value="${threshold}"></label>
+  document.getElementById("modalBody").innerHTML=`
+  <div class="fields">
+    <label>القسم الرئيسي<select id="editBuyCat" onchange="editPurchaseCategoryChanged(${i})">${catOpts}</select></label>
+    <label>المنتج<select id="editBuyProd" onchange="editPurchaseProductChanged(${i})"></select></label>
   </div>
-  <div class="actions"><button class="green" onclick="savePurchaseLineEdit(${i},${isWeight?'true':'false'})">💾 حفظ التعديل</button><button class="gray" onclick="showPurchaseDetail(${i})">إلغاء</button></div>`;
+  <div id="editPurchaseDynamic"></div>`;
+  editPurchaseProductChanged(i,{packs,size,packCost,sale,stock:oldP.stock,supplier,threshold});
   openModal();
 }
-function savePurchaseLineEdit(i,isWeight=false){
+function editPurchaseCategoryChanged(i){editPurchaseProductChanged(i)}
+function editPurchaseProductChanged(i,forced=null){
   let x=purchases[i];if(!x)return;
-  let resolved=resolvePurchaseProduct(x);if(!resolved)return alert("تعذر العثور على المنتج");
-  isWeight=!!isWeight||x.unit==="kg"||x.weightProduct||resolved.p.unit==="kg"||x.category==="الكميات بالوزن";
-  let packs=+document.getElementById("editBuyPacks").value,
-      size=isWeight?1:+document.getElementById("editBuyPackSize").value,
-      packCost=+document.getElementById("editBuyPackCost").value,
-      salePrice=+document.getElementById("editBuySalePrice").value,
-      supplier=document.getElementById("editBuySupplier").value.trim(),
-      threshold=+document.getElementById("editBuyThreshold").value||0;
-  if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(size)||size<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");
-  let oldQty=Number(x.qty)||0,newQty=isWeight?+packs.toFixed(3):+(packs*size).toFixed(3),unitCost=isWeight?packCost:packCost/size;
-  resolved.p.stock=+(Number(resolved.p.stock||0)+newQty-oldQty).toFixed(3);
-  resolved.p.cost=unitCost;resolved.p.price=salePrice;resolved.p.alertThreshold=threshold;resolved.p.unit=isWeight?"kg":resolved.p.unit;
-  resolved.p.packSize=isWeight?1:size;resolved.p.packCost=packCost;resolved.p.lastPurchaseUnitCost=unitCost;
-  x.ci=resolved.ci;x.pi=resolved.pi;x.packQty=packs;x.packSize=size;x.qty=newQty;x.cost=unitCost;x.totalCost=+(packs*packCost).toFixed(2);x.salePrice=salePrice;x.expectedProfit=+((salePrice-unitCost)*newQty).toFixed(2);x.supplier=supplier;x.unit=isWeight?"kg":(x.unit||resolved.p.unit);x.weightProduct=isWeight;
-  save();let invoiceNo=x.invoiceNo;showPurchaseDetail(i);purchasePage();alert("تم تعديل المنتج وإعادة حساب الكمية والتكلفة والربح في فاتورة رقم "+invoiceNo);
+  let ci=+document.getElementById("editBuyCat").value,c=cats[ci];
+  let sel=document.getElementById("editBuyProd"),oldResolved=resolvePurchaseProduct(x),oldPi=oldResolved?.ci===ci?oldResolved.pi:-1;
+  sel.innerHTML=c.products.map((p,pi)=>`<option value="${pi}" ${pi===oldPi?"selected":""}>${p.name}</option>`).join("")||`<option value="new">＋ لا يوجد منتج، أضف من شاشة المشتريات</option>`;
+  let pi=sel.value==="new"?-1:+sel.value,p=pi>=0?c.products[pi]:null,m=categoryPurchaseMethod(c);
+  let source=forced||{}, packs=source.packs??(pi>=0?(p?.packSize?x.packQty??1:1):1), size=source.size??(pi>=0?(p?.packSize||1):1), packCost=source.packCost??(m==="weight"?(p?.cost||0):m==="piece"?(p?.cost||0):(p?.cost||0)*(p?.packSize||1)), sale=source.sale??(p?.price||0), stock=source.stock??(p?.stock||0), supplier=source.supplier??x.supplier??"", threshold=source.threshold??(p?.alertThreshold??0);
+  let body=`<div class="notice">طريقة شراء القسم: <b>${purchaseMethodLabel(c)}</b></div><div class="fields">`;
+  if(m==="weight"){
+    body+=`<label>عدد الكيلوات المشتراة<input id="editBuyPacks" type="number" min=".001" step=".001" value="${packs}"></label>
+    <label>سعر شراء الكيلو الواحد (د.ع)<input id="editBuyPackCost" type="number" min="0" step=".01" value="${packCost}"></label>
+    <label>سعر بيع الكيلو الواحد (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>
+    <label>الكمية الموجودة حالياً بالكيلو غرام<input id="editBuyCurrentQty" type="number" min="0" step=".001" value="${stock}"></label>`;
+  }else if(m==="piece"){
+    body+=`<label>عدد القطع المشتراة<input id="editBuyPacks" type="number" min=".001" step=".001" value="${packs}"></label>
+    <label>سعر شراء القطعة الواحدة (د.ع)<input id="editBuyPackCost" type="number" min="0" step=".01" value="${packCost}"></label>
+    <label>سعر بيع القطعة الواحدة (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>
+    <label>الكمية الموجودة حالياً بالقطعة<input id="editBuyCurrentQty" type="number" min="0" step=".001" value="${stock}"></label>`;
+  }else{
+    body+=`<label>عدد الكارتونات / الباكيتات<input id="editBuyPacks" type="number" min=".01" step=".01" value="${packs}"></label>
+    <label>الوحدات داخل العبوة<input id="editBuyPackSize" type="number" min=".001" step=".001" value="${size}"></label>
+    <label>سعر شراء العبوة بالكامل (د.ع)<input id="editBuyPackCost" type="number" min="0" step=".01" value="${packCost}"></label>
+    <label>سعر بيع الوحدة الواحدة (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>
+    <label>الكمية الموجودة حالياً بالوحدة<input id="editBuyCurrentQty" type="number" min="0" step=".001" value="${stock}"></label>`;
+  }
+  body+=`<label>اسم المورد<input id="editBuySupplier" value="${String(supplier).replace(/"/g,'&quot;')}"></label>
+  <label>${m==="weight"?"حد تنبيه المخزون بالكيلو غرام":m==="piece"?"حد تنبيه المخزون بالقطعة":"حد تنبيه المخزون بالوحدة"}<input id="editBuyThreshold" type="number" min="0" step="${m==="weight"?".001":".001"}" value="${threshold}"></label></div>
+  <div class="actions"><button class="green" onclick="savePurchaseLineEdit(${i})">💾 حفظ التعديل</button><button class="gray" onclick="showPurchaseDetail(${i})">إلغاء</button></div>`;
+  document.getElementById("editPurchaseDynamic").innerHTML=body;
+}
+function savePurchaseLineEdit(i){
+  let x=purchases[i];if(!x)return;
+  let oldResolved=resolvePurchaseProduct(x);if(!oldResolved)return alert("تعذر العثور على المنتج القديم");
+  let ci=+document.getElementById("editBuyCat").value,pi=+document.getElementById("editBuyProd").value,c=cats[ci],p=c.products[pi];if(!p)return alert("اختر المنتج");
+  let m=categoryPurchaseMethod(c),packs=+document.getElementById("editBuyPacks").value,size=m==="package"?(+document.getElementById("editBuyPackSize").value||0):1,packCost=+document.getElementById("editBuyPackCost").value,salePrice=+document.getElementById("editBuySalePrice").value,currentQty=+document.getElementById("editBuyCurrentQty").value,supplier=document.getElementById("editBuySupplier").value.trim(),threshold=+document.getElementById("editBuyThreshold").value||0;
+  if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0||!Number.isFinite(currentQty)||currentQty<0)return alert("تحقق من الكميات والأسعار والمخزون الحالي");
+  if(m==="package"&&(!Number.isFinite(size)||size<=0))return alert("أدخل عدد الوحدات داخل العبوة");
+  let qty=m==="weight"?+packs.toFixed(3):m==="piece"?+packs.toFixed(3):+(packs*size).toFixed(3),unitCost=m==="package"?packCost/size:packCost;
+  // Remove the old purchase quantity from the old product first, then set the edited product stock to the entered current quantity.
+  oldResolved.p.stock=+(Math.max(0,Number(oldResolved.p.stock||0)-Number(x.qty||0))).toFixed(3);
+  p.stock=+currentQty.toFixed(3);p.price=salePrice;p.cost=unitCost;p.alertThreshold=threshold;p.categoryType=m;p.unit=m==="weight"?"kg":"piece";p.packSize=m==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;
+  x.ci=ci;x.pi=pi;x.category=c.name;x.name=p.name;x.packQty=packs;x.packSize=m==="package"?size:1;x.qty=qty;x.cost=unitCost;x.totalCost=+(packs*packCost).toFixed(2);x.salePrice=salePrice;x.expectedProfit=+((salePrice-unitCost)*qty).toFixed(2);x.supplier=supplier;x.unit=m==="weight"?"kg":"piece";x.weightProduct=m==="weight";x.currentStock=currentQty;x.currentStockEntered=true;
+  save();let invoiceNo=x.invoiceNo;showPurchaseDetail(i);purchasePage();alert("تم تعديل المنتج وبيانات الشراء والمخزون بنجاح في فاتورة رقم "+invoiceNo);
 }
 function closePurchaseInvoice(){
   let invoiceNo=ensurePurchaseDraft(),rows=purchaseInvoiceRows(invoiceNo);
@@ -831,7 +875,7 @@ function closePurchaseInvoice(){
 function purchasePage(){
   let invoiceNo=ensurePurchaseDraft();
   document.getElementById("catalog").className="";document.getElementById("heading").textContent="تسجيل مشتريات / توريد مخزون";document.getElementById("hint").textContent="رقم الفاتورة يتولد تلقائياً. أضف كل المنتجات على نفس الفاتورة ثم أغلقها عند الانتهاء";
-  let catOpts=cats.map((c,i)=>`<option value="${i}">${c.name}</option>`).join(""),currentRows=purchaseInvoiceRows(invoiceNo),currentTotal=currentRows.reduce((a,{x})=>a+Number(x.totalCost??(x.qty||0)*(x.cost||0)),0);
+  let catOpts=cats.map((c,i)=>`<option value="${i}">${c.name} — ${purchaseMethodLabel(c)}</option>`).join(""),currentRows=purchaseInvoiceRows(invoiceNo),currentTotal=currentRows.reduce((a,{x})=>a+Number(x.totalCost??(x.qty||0)*(x.cost||0)),0);
   document.getElementById("catalog").innerHTML=`
   <div class="cards">
     <div class="stat"><span>🧾 الفاتورة الحالية</span><b>رقم ${invoiceNo}</b></div>
@@ -848,10 +892,10 @@ function purchasePage(){
   <label id="buyPackCostLabel">سعر شراء الكرتون / الباكيت بالكامل (د.ع)<input id="buyPackCost" type="number" min="0" value="0"></label>
   <label>سعر شراء الوحدة الواحدة (يُحسب تلقائياً)<input id="buyUnitCostCalc" type="text" readonly value="0 د.ع"></label>
   <label>سعر بيع الوحدة الواحدة (د.ع)<input id="buyUnitPrice" type="number" min="0" value="0"></label>
-  <label>وحدة المخزون<select id="buyUnit"><option value="piece">قطعة / علبة</option><option value="kg">كيلو غرام</option></select></label>
+  <label>طريقة شراء القسم<input id="buyUnit" type="text" readonly value=""></label>
   <label id="buyCurrentQtyLabel">الكمية الموجودة حالياً (اختياري — إذا فارغة تُحسب من الكمية المشتراة)<input id="buyCurrentQty" type="number" min="0" step=".001" placeholder="مثلاً 6"></label>
   <label>اسم المورد (اختياري)<input id="supplier" placeholder="اسم المورد"></label>
-  <label>حد تنبيه المخزون<input id="buyAlertThreshold" type="number" min="0" step="1" value="0" placeholder="مثلاً 5"></label>
+  <label>حد تنبيه المخزون<input id="buyAlertThreshold" type="number" min="0" step=".001" value="0" placeholder="مثلاً 0.500"></label>
   </div>
   <div class="cards" style="margin-top:12px"><div class="stat"><span>الكمية التي ستضاف للمخزون</span><b id="buyPreviewQty">1 قطعة</b></div><div class="stat"><span>تكلفة شراء الوحدة الواحدة</span><b id="buyPreviewCost">0 د.ع</b></div><div class="stat"><span>ربح الكرتون / الباكيت الواحد</span><b id="buyPreviewPackProfit">0 د.ع</b></div><div class="stat"><span>صافي الربح المتوقع لكل الكمية المشتراة</span><b id="buyPreviewTotalProfit">0 د.ع</b></div><div class="stat"><span>إجمالي هذه العملية</span><b id="buyPreviewTotal">0 د.ع</b></div></div>
   <div class="actions"><button class="green" onclick="recordPurchase()">➕ إضافة المنتج إلى الفاتورة</button><button class="red" onclick="clearPurchaseForm()">🗑️ مسح خانات المنتج</button></div></div>
@@ -865,10 +909,10 @@ function purchasePage(){
   ["buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnit","buyCurrentQty"].forEach(id=>document.getElementById(id).addEventListener("input",updatePurchasePreview));
 }
 function purchaseCategoryChanged(){let ci=+document.getElementById("buyCat").value,sel=document.getElementById("buyProd");sel.innerHTML=cats[ci].products.map((p,pi)=>`<option value="${pi}">${p.name}</option>`).join("")+`<option value="new">＋ إضافة منتج جديد</option>`;purchaseProductChanged()}
-function purchaseProductChanged(){let ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",p=isNew?null:cats[ci].products[+val],isWeight=cats[ci].name==="الكميات بالوزن"||p?.unit==="kg";document.getElementById("newNameLabel").style.display=isNew?"block":"none";document.getElementById("buyNewName").value="";document.getElementById("buyUnit").value=isWeight?"kg":(p?p.unit:"piece");document.getElementById("buyPacks").value="1";document.getElementById("buyPackSize").value=isWeight?"1":(p?.packSize||"1");document.getElementById("buyPackCost").value=p?(isWeight?(p.cost||0):((p.cost||0)*(p.packSize||1))):0;document.getElementById("buyUnitPrice").value=p?(p.price||0):0;document.getElementById("buyAlertThreshold").value=p?(p.alertThreshold??0):0;document.getElementById("buyCurrentQty").value="";updatePurchaseFormLabels();updatePurchasePreview()}
-function updatePurchaseFormLabels(){let ci=+document.getElementById("buyCat").value,weight=cats[ci]?.name==="الكميات بالوزن"||document.getElementById("buyUnit").value==="kg";document.getElementById("buyPacksLabel").firstChild.textContent=weight?"عدد الكيلوات المشتراة":"عدد الكارتونات / الباكيتات المشتراة";document.getElementById("buyPackSizeLabel").style.display=weight?"none":"block";document.getElementById("buyPackCostLabel").firstChild.textContent=weight?"سعر شراء الكيلو الواحد (د.ع)":"سعر شراء الكرتون / الباكيت بالكامل (د.ع)";document.getElementById("buyCurrentQtyLabel").firstChild.textContent=weight?"الكمية الموجودة حالياً بالكيلو غرام (اختياري)":"العلب / الوحدات الموجودة حالياً (اختياري)";if(weight){document.getElementById("buyPackSize").value="1"}}
-function updatePurchasePreview(){let packs=+document.getElementById("buyPacks").value||0,size=+document.getElementById("buyPackSize").value||1,cost=+document.getElementById("buyPackCost").value||0,sale=+document.getElementById("buyUnitPrice").value||0,unit=document.getElementById("buyUnit").value,weight=unit==="kg"||cats[+document.getElementById("buyCat").value]?.name==="الكميات بالوزن",qty=weight?packs:packs*size,unitCost=weight?cost:(size?cost/size:0),unitProfit=sale-unitCost,packProfit=weight?unitProfit*packs:unitProfit*size,totalProfit=unitProfit*qty;document.getElementById("buyPreviewQty").textContent=qty.toLocaleString("en-US")+" "+(weight?"كغم":"قطعة");document.getElementById("buyPreviewCost").textContent=fmt(unitCost);document.getElementById("buyUnitCostCalc").value=fmt(unitCost);document.getElementById("buyPreviewPackProfit").textContent=fmt(packProfit);document.getElementById("buyPreviewTotalProfit").textContent=fmt(totalProfit);document.getElementById("buyPreviewTotal").textContent=fmt(packs*cost);updatePurchaseFormLabels()}
-function recordPurchase(){let invoiceNo=ensurePurchaseDraft(),ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",name=isNew?document.getElementById("buyNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],packs=+document.getElementById("buyPacks").value,size=+document.getElementById("buyPackSize").value||1,packCost=+document.getElementById("buyPackCost").value,salePrice=+document.getElementById("buyUnitPrice").value,unit=document.getElementById("buyUnit").value,supplier=document.getElementById("supplier").value.trim(),alertThreshold=+document.getElementById("buyAlertThreshold").value||0,currentRaw=document.getElementById("buyCurrentQty").value.trim(),weight=cats[ci].name==="الكميات بالوزن"||unit==="kg";if(weight)unit="kg";if(isNew&&!name)return alert("اكتب اسم المنتج الجديد");if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");if(!weight&&(!Number.isFinite(size)||size<=0))return alert("أدخل عدد الوحدات داخل الكرتون");if(!isNew&&p.unit!==unit)return alert("وحدة المنتج المختار لا تطابق وحدة المخزون");let qty=weight?+packs.toFixed(3):+(packs*size).toFixed(3),unitCost=weight?packCost:packCost/size,actualStock=currentRaw===""?qty:+Number(currentRaw).toFixed(3);if(currentRaw!==""&&(!Number.isFinite(actualStock)||actualStock<0))return alert("الكمية الموجودة حالياً غير صحيحة");if(isNew){p={name,price:salePrice,cost:unitCost,stock:actualStock,unit,alertThreshold};cats[ci].products.push(p)}else{p.price=salePrice;p.cost=unitCost;p.alertThreshold=alertThreshold;p.stock=actualStock}p.packSize=weight?1:size;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;p.stockUnit=unit;p.currentStockWasEntered=currentRaw!=="";p.stockInitialFromPurchase=currentRaw==="";purchases.unshift({invoiceNo,date:new Date().toLocaleString("ar-IQ"),category:cats[ci].name,name:p.name,qty,cost:unitCost,packQty:packs,packSize:weight?1:size,totalCost:+(packs*packCost).toFixed(2),salePrice,expectedProfit:+((salePrice-unitCost)*qty).toFixed(2),supplier,ci,pi:cats[ci].products.indexOf(p),unit,currentStock:actualStock,currentStockEntered:currentRaw!=="",weightProduct:weight});save();purchasePage();clearPurchaseForm();alert("تمت إضافة "+p.name+" إلى فاتورة المشتريات رقم "+invoiceNo+".")}
+function purchaseProductChanged(){let ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",p=isNew?null:cats[ci].products[+val],method=categoryPurchaseMethod(cats[ci]);document.getElementById("newNameLabel").style.display=isNew?"block":"none";document.getElementById("buyNewName").value="";document.getElementById("buyUnit").value=method;document.getElementById("buyPacks").value="1";document.getElementById("buyPackSize").value=method==="package"?(p?.packSize||"1"):"1";document.getElementById("buyPackCost").value=p?(method==="package"?((p.cost||0)*(p.packSize||1)):(p.cost||0)):0;document.getElementById("buyUnitPrice").value=p?(p.price||0):0;document.getElementById("buyAlertThreshold").value=p?(p.alertThreshold??0):0;document.getElementById("buyCurrentQty").value="";updatePurchaseFormLabels();updatePurchasePreview()}
+function updatePurchaseFormLabels(){let ci=+document.getElementById("buyCat").value,method=categoryPurchaseMethod(cats[ci]),l=document.getElementById("buyPacksLabel"),s=document.getElementById("buyPackSizeLabel"),c=document.getElementById("buyPackCostLabel"),q=document.getElementById("buyCurrentQtyLabel");l.firstChild.textContent=method==="weight"?"عدد الكيلوات المشتراة":method==="piece"?"عدد القطع المشتراة":"عدد الكارتونات / الباكيتات المشتراة";s.style.display=method==="package"?"block":"none";c.firstChild.textContent=method==="weight"?"سعر شراء الكيلو الواحد (د.ع)":method==="piece"?"سعر شراء القطعة الواحدة (د.ع)":"سعر شراء الكرتون / الباكيت بالكامل (د.ع)";q.firstChild.textContent=method==="weight"?"الكمية الموجودة حالياً بالكيلو غرام (اختياري)":method==="piece"?"الكمية الموجودة حالياً بالقطعة (اختياري)":"العلب / الوحدات الموجودة حالياً (اختياري)";let t=document.getElementById("buyAlertThreshold");if(t){t.step=method==="weight"?".001":".001";t.placeholder=method==="weight"?"مثلاً 0.500":method==="piece"?"مثلاً 5":"مثلاً 5";let lab=t.parentElement?.firstChild;if(lab)lab.textContent=method==="weight"?"حد تنبيه المخزون بالكيلو غرام":method==="piece"?"حد تنبيه المخزون بالقطعة":"حد تنبيه المخزون بالوحدة"}if(method!=="package")document.getElementById("buyPackSize").value="1"}
+function updatePurchasePreview(){let ci=+document.getElementById("buyCat").value,method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("buyPacks").value||0,size=+document.getElementById("buyPackSize").value||1,cost=+document.getElementById("buyPackCost").value||0,sale=+document.getElementById("buyUnitPrice").value||0,qty=method==="weight"||method==="piece"?packs:packs*size,unitCost=method==="package"?(size?cost/size:0):cost,unitProfit=sale-unitCost,totalProfit=unitProfit*qty,operationTotal=packs*cost;document.getElementById("buyPreviewQty").textContent=qty.toLocaleString("en-US")+" "+(method==="weight"?"كغم":"قطعة");document.getElementById("buyPreviewCost").textContent=fmt(unitCost);document.getElementById("buyUnitCostCalc").value=fmt(unitCost);document.getElementById("buyPreviewPackProfit").textContent=fmt(method==="package"?unitProfit*size:unitProfit*packs);document.getElementById("buyPreviewTotalProfit").textContent=fmt(totalProfit);document.getElementById("buyPreviewTotal").textContent=fmt(operationTotal);updatePurchaseFormLabels()}
+function recordPurchase(){let invoiceNo=ensurePurchaseDraft(),ci=+document.getElementById("buyCat").value,val=document.getElementById("buyProd").value,isNew=val==="new",name=isNew?document.getElementById("buyNewName").value.trim():"",p=isNew?null:cats[ci].products[+val],method=categoryPurchaseMethod(cats[ci]),packs=+document.getElementById("buyPacks").value,size=method==="package"?(+document.getElementById("buyPackSize").value||0):1,packCost=+document.getElementById("buyPackCost").value,salePrice=+document.getElementById("buyUnitPrice").value,supplier=document.getElementById("supplier").value.trim(),alertThreshold=+document.getElementById("buyAlertThreshold").value||0,currentRaw=document.getElementById("buyCurrentQty").value.trim();if(isNew&&!name)return alert("اكتب اسم المنتج الجديد");if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");if(method==="package"&&(!Number.isFinite(size)||size<=0))return alert("أدخل عدد الوحدات داخل الكرتون / الباكيت");let qty=method==="weight"||method==="piece"?+packs.toFixed(3):+(packs*size).toFixed(3),unitCost=method==="package"?packCost/size:packCost,actualStock=currentRaw===""?qty:+Number(currentRaw).toFixed(3);if(currentRaw!==""&&(!Number.isFinite(actualStock)||actualStock<0))return alert("الكمية الموجودة حالياً غير صحيحة");if(isNew){p={name,price:salePrice,cost:unitCost,stock:actualStock,unit:method==="weight"?"kg":"piece",alertThreshold,categoryType:method};cats[ci].products.push(p)}else{p.price=salePrice;p.cost=unitCost;p.alertThreshold=alertThreshold;p.stock=actualStock;p.unit=method==="weight"?"kg":"piece";p.categoryType=method}p.packSize=method==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;p.stockUnit=p.unit;p.currentStockWasEntered=currentRaw!=="";p.stockInitialFromPurchase=currentRaw==="";purchases.unshift({invoiceNo,date:new Date().toLocaleString("ar-IQ"),category:cats[ci].name,name:p.name,qty,cost:unitCost,packQty:packs,packSize:method==="package"?size:1,totalCost:+(packs*packCost).toFixed(2),salePrice,expectedProfit:+((salePrice-unitCost)*qty).toFixed(2),supplier,ci,pi:cats[ci].products.indexOf(p),unit:p.unit,currentStock:actualStock,currentStockEntered:currentRaw!=="",weightProduct:method==="weight",purchaseMethod:method});save();purchasePage();clearPurchaseForm();alert("تمت إضافة "+p.name+" إلى فاتورة المشتريات رقم "+invoiceNo+".")}
 function clearPurchaseForm(){["buyNewName","buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnitCostCalc","buyCurrentQty","supplier","buyAlertThreshold"].forEach(id=>{let e=document.getElementById(id);if(e)e.value=id==="buyPacks"||id==="buyPackSize"?"1":id==="buyUnitCostCalc"?"0 د.ع":""});let b=document.getElementById("buyProd");if(b)b.selectedIndex=0;updatePurchasePreview()}
 function notificationsPage(){document.getElementById("catalog").className="";document.getElementById("heading").textContent="التنبيهات";document.getElementById("hint").textContent="تنبيهات المخزون والعمليات التي تحتاج انتباهك";let low=[];cats.forEach(c=>c.products.forEach(p=>{let t=Number(p.alertThreshold??0);if(t>0&&Number(p.stock)<=t)low.push({name:p.name,stock:p.stock,threshold:t,cat:c.name,unit:p.unit});}));let debtAlerts=debts.filter(d=>d.amount>d.paid).length;document.getElementById("catalog").innerHTML=`<div class="cards">
 <div class="stat">
