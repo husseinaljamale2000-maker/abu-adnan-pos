@@ -775,7 +775,7 @@ function showPurchaseDetail(i){
     <div class="stat"><span>الربح المتوقع</span><b style="color:${profit<0?"#bd3d26":"#159447"}">${fmt(profit)}</b></div>
   </div>
   <div class="tablewrap"><table><thead><tr><th>المنتج</th><th>الكمية</th><th>تكلفة الوحدة</th><th>سعر البيع</th><th>الإجمالي</th><th>الإجراء</th></tr></thead><tbody>
-  ${rows.map(({x,i})=>`<tr><td><b>${x.name}</b></td><td>${x.qty}</td><td>${fmt(x.cost)}</td><td>${fmt(x.salePrice||0)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td><button class="blue" onclick="editPurchaseLine(${i})">✏️ تعديل</button></td></tr>`).join("")||'<tr><td colspan="6">لا توجد منتجات</td></tr>'}
+  ${rows.map(({x,i})=>`<tr><td><b>${x.name}</b></td><td>${x.qty} ${x.unit==="kg"||x.weightProduct?"كغم":"وحدة"}</td><td>${fmt(x.cost)}</td><td>${fmt(x.salePrice||0)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td><button class="blue" onclick="editPurchaseLine(${i})">✏️ تعديل</button></td></tr>`).join("")||'<tr><td colspan="6">لا توجد منتجات</td></tr>'}
   </tbody><tfoot><tr><th colspan="4">إجمالي الفاتورة</th><th>${fmt(total)}</th><th></th></tr><tr><th colspan="4">الربح المتوقع</th><th>${fmt(profit)}</th><th></th></tr></tfoot></table></div>
   <div class="actions"><button class="gray" onclick="closeModal()">إغلاق</button></div>`;
   openModal();
@@ -783,30 +783,43 @@ function showPurchaseDetail(i){
 function editPurchaseLine(i){
   let x=purchases[i];if(!x)return;
   let resolved=resolvePurchaseProduct(x);if(!resolved)return alert("تعذر العثور على المنتج المرتبط بهذه المشتريات");
-  let packs=x.packQty??x.qty,size=x.packSize??1,packCost=(x.totalCost!=null?x.totalCost:((x.cost||0)*(x.qty||0)))/(Number(size)||1),sale=x.salePrice??resolved.p.price,supplier=x.supplier||"",threshold=resolved.p.alertThreshold??0;
+  let isWeight=x.unit==="kg"||x.weightProduct||resolved.p.unit==="kg"||resolved.p.categoryType==="weight"||resolved.catName==="الكميات بالوزن"||x.category==="الكميات بالوزن";
+  let packs=x.packQty??x.qty,size=x.packSize??1;
+  let packCost=isWeight?(Number(x.cost)||0):((x.totalCost!=null?Number(x.totalCost):((x.cost||0)*(x.qty||0)))/(Number(size)||1));
+  let sale=x.salePrice??resolved.p.price,supplier=x.supplier||"",threshold=resolved.p.alertThreshold??0;
   document.getElementById("modalTitle").textContent="✏️ تعديل منتج في فاتورة رقم "+(x.invoiceNo||"—");
-  document.getElementById("modalBody").innerHTML=`<p><b>${x.name}</b></p><div class="fields">
+  document.getElementById("modalBody").innerHTML=`<p><b>${x.name}</b></p><div class="notice">المخزون الحالي: <b>${fmt(resolved.p.stock)} ${isWeight?"كغم":"وحدة"}</b></div><div class="fields">
+  ${isWeight?`
+  <label>عدد الكيلوات المشتراة<input id="editBuyPacks" type="number" min=".001" step=".001" value="${packs}"></label>
+  <label>سعر شراء الكيلو الواحد (د.ع)<input id="editBuyPackCost" type="number" min="0" step=".01" value="${packCost}"></label>
+  <label>سعر بيع الكيلو الواحد (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>`:`
   <label>عدد الكراتين / الباكيتات<input id="editBuyPacks" type="number" min=".01" step=".01" value="${packs}"></label>
   <label>الوحدات داخل العبوة<input id="editBuyPackSize" type="number" min=".001" step=".001" value="${size}"></label>
   <label>سعر شراء العبوة بالكامل (د.ع)<input id="editBuyPackCost" type="number" min="0" step=".01" value="${packCost}"></label>
-  <label>سعر بيع الوحدة (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>
+  <label>سعر بيع الوحدة (د.ع)<input id="editBuySalePrice" type="number" min="0" step=".01" value="${sale}"></label>`}
   <label>اسم المورد<input id="editBuySupplier" value="${String(supplier).replace(/"/g,'&quot;')}"></label>
   <label>حد تنبيه المخزون<input id="editBuyThreshold" type="number" min="0" step="1" value="${threshold}"></label>
   </div>
-  <div class="actions"><button class="green" onclick="savePurchaseLineEdit(${i})">💾 حفظ التعديل</button><button class="gray" onclick="showPurchaseDetail(${i})">إلغاء</button></div>`;
+  <div class="actions"><button class="green" onclick="savePurchaseLineEdit(${i},${isWeight?'true':'false'})">💾 حفظ التعديل</button><button class="gray" onclick="showPurchaseDetail(${i})">إلغاء</button></div>`;
   openModal();
 }
-function savePurchaseLineEdit(i){
+function savePurchaseLineEdit(i,isWeight=false){
   let x=purchases[i];if(!x)return;
   let resolved=resolvePurchaseProduct(x);if(!resolved)return alert("تعذر العثور على المنتج");
-  let packs=+document.getElementById("editBuyPacks").value,size=+document.getElementById("editBuyPackSize").value,packCost=+document.getElementById("editBuyPackCost").value,salePrice=+document.getElementById("editBuySalePrice").value,supplier=document.getElementById("editBuySupplier").value.trim(),threshold=+document.getElementById("editBuyThreshold").value||0;
+  isWeight=!!isWeight||x.unit==="kg"||x.weightProduct||resolved.p.unit==="kg"||x.category==="الكميات بالوزن";
+  let packs=+document.getElementById("editBuyPacks").value,
+      size=isWeight?1:+document.getElementById("editBuyPackSize").value,
+      packCost=+document.getElementById("editBuyPackCost").value,
+      salePrice=+document.getElementById("editBuySalePrice").value,
+      supplier=document.getElementById("editBuySupplier").value.trim(),
+      threshold=+document.getElementById("editBuyThreshold").value||0;
   if(!Number.isFinite(packs)||packs<=0||!Number.isFinite(size)||size<=0||!Number.isFinite(packCost)||packCost<0||!Number.isFinite(salePrice)||salePrice<0)return alert("تحقق من الكميات والأسعار");
-  if(resolved.p.unit!==x.unit&&x.unit&&resolved.p.unit!==x.unit)return alert("وحدة المنتج غير متطابقة");
-  let oldQty=Number(x.qty)||0,newQty=+(packs*size).toFixed(3),unitCost=packCost/size;
+  let oldQty=Number(x.qty)||0,newQty=isWeight?+packs.toFixed(3):+(packs*size).toFixed(3),unitCost=isWeight?packCost:packCost/size;
   resolved.p.stock=+(Number(resolved.p.stock||0)+newQty-oldQty).toFixed(3);
-  resolved.p.cost=unitCost;resolved.p.price=salePrice;resolved.p.alertThreshold=threshold;
-  x.ci=resolved.ci;x.pi=resolved.pi;x.packQty=packs;x.packSize=size;x.qty=newQty;x.cost=unitCost;x.totalCost=+(packs*packCost).toFixed(2);x.salePrice=salePrice;x.expectedProfit=+(salePrice-unitCost)*newQty;x.supplier=supplier;
-  save();let invoiceNo=x.invoiceNo;showPurchaseDetail(i);purchasePage();alert("تم تعديل المنتج وإعادة حساب كمية المخزون وإجمالي وربح الفاتورة رقم "+invoiceNo);
+  resolved.p.cost=unitCost;resolved.p.price=salePrice;resolved.p.alertThreshold=threshold;resolved.p.unit=isWeight?"kg":resolved.p.unit;
+  resolved.p.packSize=isWeight?1:size;resolved.p.packCost=packCost;resolved.p.lastPurchaseUnitCost=unitCost;
+  x.ci=resolved.ci;x.pi=resolved.pi;x.packQty=packs;x.packSize=size;x.qty=newQty;x.cost=unitCost;x.totalCost=+(packs*packCost).toFixed(2);x.salePrice=salePrice;x.expectedProfit=+((salePrice-unitCost)*newQty).toFixed(2);x.supplier=supplier;x.unit=isWeight?"kg":(x.unit||resolved.p.unit);x.weightProduct=isWeight;
+  save();let invoiceNo=x.invoiceNo;showPurchaseDetail(i);purchasePage();alert("تم تعديل المنتج وإعادة حساب الكمية والتكلفة والربح في فاتورة رقم "+invoiceNo);
 }
 function closePurchaseInvoice(){
   let invoiceNo=ensurePurchaseDraft(),rows=purchaseInvoiceRows(invoiceNo);
@@ -844,10 +857,10 @@ function purchasePage(){
   <div class="actions"><button class="green" onclick="recordPurchase()">➕ إضافة المنتج إلى الفاتورة</button><button class="red" onclick="clearPurchaseForm()">🗑️ مسح خانات المنتج</button></div></div>
   <h3>منتجات الفاتورة الحالية رقم ${invoiceNo}</h3>
   <div class="tablewrap"><table><thead><tr><th>المنتج</th><th>الكمية</th><th>تكلفة الوحدة</th><th>سعر البيع</th><th>الإجمالي</th><th>الإجراء</th></tr></thead><tbody>
-  ${currentRows.map(({x,i})=>`<tr><td><b>${x.name}</b></td><td>${x.qty}</td><td>${fmt(x.cost)}</td><td>${fmt(x.salePrice||0)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td><button class="blue" onclick="editPurchaseLine(${i})">✏️ تعديل</button></td></tr>`).join("")||'<tr><td colspan="6">لم تضف أي منتج إلى هذه الفاتورة بعد.</td></tr>'}
+  ${currentRows.map(({x,i})=>`<tr><td><b>${x.name}</b></td><td>${x.qty} ${x.unit==="kg"||x.weightProduct?"كغم":"وحدة"}</td><td>${fmt(x.cost)}</td><td>${fmt(x.salePrice||0)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td><button class="blue" onclick="editPurchaseLine(${i})">✏️ تعديل</button></td></tr>`).join("")||'<tr><td colspan="6">لم تضف أي منتج إلى هذه الفاتورة بعد.</td></tr>'}
   </tbody><tfoot><tr><th colspan="4">إجمالي الفاتورة الحالية</th><th>${fmt(currentTotal)}</th><th></th></tr></tfoot></table></div>
   <h3>سجل المشتريات السابق</h3><div class="tablewrap"><table><thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>المنتج</th><th>العبوات</th><th>الوحدات/عبوة</th><th>الكمية</th><th>تكلفة الوحدة</th><th>الإجمالي</th><th>المورد</th></tr></thead><tbody>
-  ${purchases.slice(0,100).map((x,i)=>`<tr onclick="showPurchaseDetail(${i})" style="cursor:pointer" title="اضغط لعرض تفاصيل الفاتورة"><td>${x.invoiceNo||purchases.length-i}</td><td>${x.date}</td><td>${x.name}</td><td>${x.packQty??x.qty}</td><td>${x.packSize??1}</td><td>${x.qty}</td><td>${fmt(x.cost)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td>${x.supplier||"—"}</td></tr>`).join("")||'<tr><td colspan="9">لا توجد مشتريات مسجلة بعد</td></tr>'}</tbody></table></div>`;
+  ${purchases.slice(0,100).map((x,i)=>`<tr onclick="showPurchaseDetail(${i})" style="cursor:pointer" title="اضغط لعرض تفاصيل الفاتورة"><td>${x.invoiceNo||purchases.length-i}</td><td>${x.date}</td><td>${x.name}</td><td>${x.packQty??x.qty}</td><td>${x.packSize??1}</td><td>${x.qty} ${x.unit==="kg"||x.weightProduct?"كغم":"وحدة"}</td><td>${fmt(x.cost)}</td><td>${fmt(x.totalCost??x.qty*x.cost)}</td><td>${x.supplier||"—"}</td></tr>`).join("")||'<tr><td colspan="9">لا توجد مشتريات مسجلة بعد</td></tr>'}</tbody></table></div>`;
   purchaseCategoryChanged();
   ["buyPacks","buyPackSize","buyPackCost","buyUnitPrice","buyUnit","buyCurrentQty"].forEach(id=>document.getElementById(id).addEventListener("input",updatePurchasePreview));
 }
