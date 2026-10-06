@@ -136,6 +136,7 @@ if(localStorage.getItem("posBlank40ProductsClearedV1")!=="yes"){cats=cats.map(c=
 cats.forEach(c=>c.products.forEach(p=>{if(p.cost===undefined)p.cost=0;if(p.stock===undefined)p.stock=0;if(!p.unit)p.unit="piece"}));
 let cart=[],active=-1,current="sale",sales=JSON.parse(localStorage.getItem("posBlank40Sales")||"[]"),purchases=JSON.parse(localStorage.getItem("posBlank40Purchases")||"[]"),closedDays=JSON.parse(localStorage.getItem("posBlank40ClosedDays")||"[]"),debts=JSON.parse(localStorage.getItem("posBlank40Debts")||"[]"),activeSalesDay=localStorage.getItem("posBlank40ActiveSalesDay")||null;
 let purchaseDraftInvoiceNo=localStorage.getItem("posBlank40PurchaseDraftInvoiceNo")||null;
+let purchaseEditBackup=null;
 let undoStack=[],redoStack=[],historyLast=null,historyReady=false,historyRestoring=false;
 if(localStorage.getItem("posBlank40FreshStartV27")!=="yes"){cats=cats.map(c=>({...c,products:[]}));sales=[];purchases=[];closedDays=[];debts=[];activeSalesDay=null;localStorage.setItem("posBlank40Cats",JSON.stringify(cats));localStorage.setItem("posBlank40Sales","[]");localStorage.setItem("posBlank40Purchases","[]");localStorage.setItem("posBlank40ClosedDays","[]");localStorage.setItem("posBlank40Debts","[]");localStorage.removeItem("posBlank40ActiveSalesDay");localStorage.setItem("posBlank40FreshStartV27","yes");}
 const todayKey=()=>{let d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
@@ -572,7 +573,7 @@ function ensureActiveSalesSession(){
   return activeSalesDay;
 }
 function pay(method){if(!cart.length)return alert("الفاتورة فارغة");let debtor="";if(method==="دين"){debtor=prompt("أدخل اسم الشخص المدين:");if(debtor===null)return;debtor=debtor.trim();if(!debtor)return alert("اسم الشخص مطلوب لتسجيل الدين")}for(let x of cart){let p=cats[x.ci].products[x.pi];if(p.stock<x.qty&&!confirm(`المتوفر من ${p.name} هو ${p.stock} فقط. هل تريد إكمال البيع ويصبح المخزون سالباً؟`))return}let sub=cart.reduce((s,p)=>s+p.price*p.qty,0),discount=Math.max(0,+document.getElementById("discount").value||0),total=Math.max(0,sub-discount),profit=cart.reduce((s,x)=>s+(x.price-x.cost)*x.qty,0)-discount,id=Date.now(),date=new Date().toLocaleString("ar-IQ"),sessionKey=ensureActiveSalesSession();cart.forEach(x=>cats[x.ci].products[x.pi].stock-=x.qty);sales.unshift({id,dayKey:sessionKey,date,method,debtor:method==="دين"?debtor:"",items:cart.map(x=>({...x})),subtotal:sub,discount,total,profit});if(method==="دين")debts.unshift({id,debtor,amount:total,paid:0,date,invoiceId:id});save();alert((method==="دين"?"تم تسجيل الدين باسم "+debtor+"\n":"تم تسجيل الفاتورة\n")+"الإجمالي: "+fmt(total)+"\nالربح التقديري: "+fmt(profit));clearCart();if(current==="sale")showCats()}
-function openModal(){document.getElementById("modal").classList.add("show")}function closeModal(){document.getElementById("modal").classList.remove("show")}function openHelp(){let title="تعليمات الاستخدام",body="";if(current==="sale"){title="تعليمات الكاشير";body=`<ol>
+function openModal(){document.getElementById("modal").classList.add("show")}function closeModal(){if(purchaseEditBackup)cancelPurchaseLineEdit();document.getElementById("modal").classList.remove("show")}function openHelp(){let title="تعليمات الاستخدام",body="";if(current==="sale"){title="تعليمات الكاشير";body=`<ol>
 <li>اختر القسم من واجهة الكاشير.</li>
 <li>اضغط على المنتج لإضافته إلى الفاتورة.</li>
 <li>راجع الكميات والأسعار في الفاتورة، ويمكنك تعديل الكمية أو حذف المنتج.</li>
@@ -803,6 +804,7 @@ function showPurchaseDetail(i){
 }
 function editPurchaseLine(i){
   let x=purchases[i];if(!x)return;
+  purchaseEditBackup={cats:JSON.parse(JSON.stringify(cats)),purchases:JSON.parse(JSON.stringify(purchases)),purchaseDraftInvoiceNo};
   let resolved=resolvePurchaseProduct(x);if(!resolved)return alert("تعذر العثور على المنتج المرتبط بهذه المشتريات");
   let oldCat=resolved.ci,oldPi=resolved.pi,oldP=resolved.p,oldCatObj=cats[oldCat],method=categoryPurchaseMethod(oldCatObj);
   let packs=x.packQty??x.qty,size=x.packSize??1,unitCost=Number(x.cost)||0;
@@ -848,8 +850,18 @@ function editPurchaseProductChanged(i,forced=null){
   }
   body+=`<label>اسم المورد<input id="editBuySupplier" value="${String(supplier).replace(/"/g,'&quot;')}"></label>
   <label>${m==="weight"?"حد تنبيه المخزون بالكيلو غرام":m==="piece"?"حد تنبيه المخزون بالقطعة":"حد تنبيه المخزون بالوحدة"}<input id="editBuyThreshold" type="number" min="0" step="${m==="weight"?".001":".001"}" value="${threshold}"></label></div>
-  <div class="actions"><button class="green" onclick="savePurchaseLineEdit(${i})">💾 حفظ التعديل</button><button class="gray" onclick="showPurchaseDetail(${i})">إلغاء</button></div>`;
+  <div class="actions"><button class="green" onclick="savePurchaseLineEdit(${i})">💾 حفظ التعديل</button><button class="gray" onclick="cancelPurchaseLineEdit()">إلغاء</button></div>`;
   document.getElementById("editPurchaseDynamic").innerHTML=body;
+}
+function cancelPurchaseLineEdit(){
+  if(!purchaseEditBackup)return;
+  cats=JSON.parse(JSON.stringify(purchaseEditBackup.cats));
+  purchases=JSON.parse(JSON.stringify(purchaseEditBackup.purchases));
+  purchaseDraftInvoiceNo=purchaseEditBackup.purchaseDraftInvoiceNo||null;
+  purchaseEditBackup=null;
+  save();
+  purchasePage();
+  closeModal();
 }
 function savePurchaseLineEdit(i){
   let x=purchases[i];if(!x)return;
@@ -863,7 +875,7 @@ function savePurchaseLineEdit(i){
   oldResolved.p.stock=+(Math.max(0,Number(oldResolved.p.stock||0)-Number(x.qty||0))).toFixed(3);
   p.stock=+currentQty.toFixed(3);p.price=salePrice;p.cost=unitCost;p.alertThreshold=threshold;p.categoryType=m;p.unit=m==="weight"?"kg":"piece";p.packSize=m==="package"?size:1;p.packCost=packCost;p.lastPurchaseUnitCost=unitCost;
   x.ci=ci;x.pi=pi;x.category=c.name;x.name=p.name;x.packQty=packs;x.packSize=m==="package"?size:1;x.qty=qty;x.cost=unitCost;x.totalCost=+(packs*packCost).toFixed(2);x.salePrice=salePrice;x.expectedProfit=+((salePrice-unitCost)*qty).toFixed(2);x.supplier=supplier;x.unit=m==="weight"?"kg":"piece";x.weightProduct=m==="weight";x.currentStock=currentQty;x.currentStockEntered=true;
-  save();let invoiceNo=x.invoiceNo;showPurchaseDetail(i);purchasePage();alert("تم تعديل المنتج وبيانات الشراء والمخزون بنجاح في فاتورة رقم "+invoiceNo);
+  save();let invoiceNo=x.invoiceNo;purchaseEditBackup=null;showPurchaseDetail(i);purchasePage();alert("تم تعديل المنتج وبيانات الشراء والمخزون بنجاح في فاتورة رقم "+invoiceNo);
 }
 function closePurchaseInvoice(){
   let invoiceNo=ensurePurchaseDraft(),rows=purchaseInvoiceRows(invoiceNo);
